@@ -226,6 +226,29 @@ describe('timeline-store: addClipToTimeline', () => {
     expect(newSeg.endTime).toBe(3000)
   })
 
+  it('is a no-op if clip duration is zero or negative', () => {
+    const existingSegment = makeSegment({ startTime: 0, endTime: 3000 })
+    const existingTrack = makeTrack({ id: 'track-1', type: 'clip', segments: [existingSegment] })
+    const timeline = makeTimeline({ tracks: [existingTrack] })
+    useTimelineStore.setState({ timeline })
+
+    const originalTracks = useTimelineStore.getState().timeline!.tracks
+
+    const zeroDurationClip = makeClip({ duration: 0 })
+    useTimelineStore.getState().addClipToTimeline(zeroDurationClip)
+
+    const afterZero = useTimelineStore.getState().timeline!.tracks
+    expect(afterZero[0].segments).toHaveLength(1)
+    expect(afterZero).toStrictEqual(originalTracks)
+
+    const negativeDurationClip = makeClip({ duration: -100 })
+    useTimelineStore.getState().addClipToTimeline(negativeDurationClip)
+
+    const afterNegative = useTimelineStore.getState().timeline!.tracks
+    expect(afterNegative[0].segments).toHaveLength(1)
+    expect(afterNegative).toStrictEqual(originalTracks)
+  })
+
   it('creates unique ids for segment and track', () => {
     const timeline = makeTimeline({ tracks: [] })
     useTimelineStore.setState({ timeline })

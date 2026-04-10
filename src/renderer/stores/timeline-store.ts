@@ -96,6 +96,7 @@ export const useTimelineStore = create<TimelineState>()(
       addClipToTimeline: (clip, insertTimeMs) =>
         set((state) => {
           if (!state.timeline) return state
+          if (clip.duration <= 0) return state
 
           const existingTrack = state.timeline.tracks.find(
             (t) => t.type === 'clip' || t.type === 'recording',
