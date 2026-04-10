@@ -26,6 +26,42 @@ const api = {
     import: (): Promise<ArchiveImportResult | null> =>
       ipcRenderer.invoke(IPC_CHANNELS.ARCHIVE_IMPORT),
   },
+  recording: {
+    start: (args: { webviewId: number; projectId?: string }): Promise<{
+      success: boolean
+      recordingId?: string
+      outputDir?: string
+      error?: string
+    }> => ipcRenderer.invoke(IPC_CHANNELS.RECORDING_START, args),
+    stop: (): Promise<{
+      success: boolean
+      recordingId?: string
+      outputDir?: string
+      domEvents?: unknown[]
+      duration?: number
+      error?: string
+    }> => ipcRenderer.invoke(IPC_CHANNELS.RECORDING_STOP),
+    pause: (): Promise<{ success: boolean }> => ipcRenderer.invoke('recording:pause'),
+    resume: (): Promise<{ success: boolean }> => ipcRenderer.invoke('recording:resume'),
+    convert: (args: {
+      recordingId: string
+      webmPath: string
+      outputDir: string
+      projectId: string
+    }): Promise<{ success: boolean; videoPath?: string; eventsPath?: string; error?: string }> =>
+      ipcRenderer.invoke('recording:convert', args),
+    onProgress: (callback: (progress: { recordingId: string; stage: string; percent: number }) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, progress: { recordingId: string; stage: string; percent: number }) => callback(progress)
+      ipcRenderer.on(IPC_CHANNELS.RENDER_PROGRESS, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.RENDER_PROGRESS, handler)
+    },
+    getStatus: (): Promise<{
+      isRecording: boolean
+      recordingId: string | null
+      status: string
+      duration: number
+    }> => ipcRenderer.invoke(IPC_CHANNELS.WORKER_STATUS),
+  },
 }
 
 export type LeonardoAPI = typeof api

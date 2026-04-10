@@ -1,6 +1,7 @@
 import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'path'
 import { registerProjectIPC } from './ipc/project.ipc'
+import { registerRecordingIPC } from './ipc/recording.ipc'
 import { initDatabase, closeDatabase } from './services/project-store'
 
 let mainWindow: BrowserWindow | null = null
@@ -19,6 +20,7 @@ function createWindow(): void {
       sandbox: false,
       contextIsolation: true,
       nodeIntegration: false,
+      webviewTag: true,
     },
   })
 
@@ -42,6 +44,7 @@ function createWindow(): void {
 app.whenReady().then(() => {
   initDatabase()
   registerProjectIPC()
+  registerRecordingIPC()
   createWindow()
 
   app.on('activate', () => {

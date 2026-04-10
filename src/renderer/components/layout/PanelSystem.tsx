@@ -1,6 +1,7 @@
 import { useCallback, useRef } from 'react'
 import type { WorkspacePreset } from '../../stores/ui-store'
 import { useUIStore } from '../../stores/ui-store'
+import { RecordingBrowser } from '../browser/RecordingBrowser'
 
 interface PanelSystemProps {
   preset: WorkspacePreset
@@ -67,9 +68,11 @@ export function PanelSystem({ preset }: PanelSystemProps): React.ReactNode {
               {preset === 'recording' ? 'Browser' : 'Preview'}
             </div>
             <div className="panel-content">
-              <p className="panel-placeholder">
-                {preset === 'recording' ? 'Recording Browser' : 'Video Preview'}
-              </p>
+              {preset === 'recording' ? (
+                <RecordingBrowser />
+              ) : (
+                <p className="panel-placeholder">Video Preview</p>
+              )}
             </div>
           </div>
 
