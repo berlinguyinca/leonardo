@@ -1,0 +1,12 @@
+{
+  "mode": "ralplan",
+  "active": false,
+  "session_id": "leonardo-consensus-2026-04-09",
+  "started_at": "2026-04-09T00:00:00Z",
+  "completed_at": "2026-04-09T00:00:00Z",
+  "spec_file": ".omc/specs/deep-interview-leonardo-video-production.md",
+  "plan_file": ".omc/plans/leonardo-implementation-plan.md",
+  "iterations": 1,
+  "verdict": "APPROVED",
+  "status": "completed"
+}
