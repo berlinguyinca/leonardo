@@ -1,5 +1,6 @@
 import { useUIStore } from '../../stores/ui-store'
 import type { WorkspacePreset } from '../../stores/ui-store'
+import { ViewModeToggle } from './ViewModeToggle'
 
 export function Toolbar(): React.ReactNode {
   const theme = useUIStore((s) => s.theme)
@@ -35,6 +36,7 @@ export function Toolbar(): React.ReactNode {
       </nav>
 
       <div className="toolbar-right">
+        <ViewModeToggle />
         <button
           className="toolbar-btn toolbar-theme-toggle"
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
