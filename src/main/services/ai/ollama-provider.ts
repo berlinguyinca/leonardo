@@ -1,0 +1,106 @@
+import type { IAIProvider } from '@shared/interfaces/ai-provider'
+import type { Script, ScriptGenContext } from '@shared/types/ai'
+import type { DOMEvent } from '@shared/types/events'
+import type { SyncPoint } from '@shared/types/timeline'
+import { v4 as uuidv4 } from 'uuid'
+import { buildScriptPrompt, getSystemPrompt } from './prompt-templates'
+import { parseScriptText } from './script-parser'
+
+export class OllamaProvider implements IAIProvider {
+  readonly name = 'Ollama'
+  private baseUrl: string
+  private model: string
+
+  constructor(model = 'llama3', baseUrl = 'http://localhost:11434') {
+    this.model = model
+    this.baseUrl = baseUrl
+  }
+
+  get isAvailable(): boolean {
+    // Ollama is always "available" — actual availability checked via testConnection
+    return true
+  }
+
+  async generateScript(prompt: string, context: ScriptGenContext): Promise<Script> {
+    const scriptId = uuidv4()
+    const userMessage = buildScriptPrompt(context)
+
+    const response = await this.chat([
+      { role: 'system', content: getSystemPrompt() },
+      { role: 'user', content: userMessage },
+    ])
+
+    const sections = parseScriptText(response, scriptId)
+
+    return {
+      id: scriptId,
+      projectId: '',
+      sections,
+      aiBackendUsed: 'ollama',
+      prompt,
+      generatedAt: new Date().toISOString(),
+    }
+  }
+
+  async refineSyncPoints(script: Script, domEvents: DOMEvent[]): Promise<SyncPoint[]> {
+    const response = await this.chat([
+      {
+        role: 'system',
+        content: 'You are a video sync point analyzer. Output JSON array of sync points.',
+      },
+      {
+        role: 'user',
+        content: `Script:\n${script.sections.map((s) => s.text).join('\n\n')}\n\nDOM events:\n${JSON.stringify(domEvents.slice(0, 50), null, 2)}\n\nReturn a JSON array of sync points.`,
+      },
+    ])
+
+    try {
+      const jsonMatch = response.match(/\[[\s\S]*\]/)
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0])
+      }
+    } catch {
+      // Parse error
+    }
+    return []
+  }
+
+  async testConnection(): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/tags`)
+      return response.ok
+    } catch {
+      return false
+    }
+  }
+
+  async listModels(): Promise<string[]> {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/tags`)
+      if (!response.ok) return []
+      const data = (await response.json()) as { models?: { name: string }[] }
+      return data.models?.map((m) => m.name) ?? []
+    } catch {
+      return []
+    }
+  }
+
+  private async chat(messages: { role: string; content: string }[]): Promise<string> {
+    const response = await fetch(`${this.baseUrl}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: this.model,
+        messages,
+        stream: false,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Ollama API error: ${response.status} ${response.statusText}`)
+    }
+
+    const data = (await response.json()) as { message?: { content?: string } }
+    return data.message?.content ?? ''
+  }
+}
