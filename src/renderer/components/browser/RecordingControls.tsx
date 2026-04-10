@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRecordingStore } from '../../stores/recording-store'
 import { useUIStore } from '../../stores/ui-store'
 import { useLibraryStore } from '../../stores/library-store'
+import { useTimelineStore } from '../../stores/timeline-store'
 import type { Clip } from '@shared/types/events'
 
 interface RecordingControlsProps {
@@ -29,10 +30,12 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
   const addClip = useLibraryStore((s) => s.addClip)
   const setHighlightedClip = useLibraryStore((s) => s.setHighlightedClip)
   const clipCount = useLibraryStore((s) => s.clips.length)
+  const addClipToTimeline = useTimelineStore((s) => s.addClipToTimeline)
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const startTimeRef = useRef<number>(0)
   const [pausedDuration, setPausedDuration] = useState(0)
+  const [pendingClip, setPendingClip] = useState<Clip | null>(null)
 
   const startTimer = useCallback(() => {
     startTimeRef.current = Date.now() - pausedDuration
@@ -51,6 +54,12 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
   useEffect(() => {
     return () => stopTimer()
   }, [stopTimer])
+
+  useEffect(() => {
+    if (!pendingClip) return
+    const timer = setTimeout(() => setPendingClip(null), 6000)
+    return () => clearTimeout(timer)
+  }, [pendingClip])
 
   const handleStart = useCallback(async () => {
     setStatus('recording')
@@ -99,6 +108,7 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
       }
       addClip(clip)
       setHighlightedClip(clip.id)
+      setPendingClip(clip)
     }
 
     restorePanelState()
@@ -147,6 +157,21 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
           <span className="processing-label">Processing...</span>
         )}
       </div>
+
+      {pendingClip && (
+        <div className="post-recording-prompt">
+          <span>Clip added to library.</span>
+          <button
+            onClick={() => {
+              addClipToTimeline(pendingClip)
+              setPendingClip(null)
+            }}
+          >
+            Edit Now
+          </button>
+          <button onClick={() => setPendingClip(null)}>Later</button>
+        </div>
+      )}
     </div>
   )
 }
