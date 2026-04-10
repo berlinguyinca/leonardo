@@ -906,3 +906,75 @@ body {
   min-width: 40px;
   text-align: center;
 }
+
+/* Properties Panel */
+.properties-form {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.properties-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.properties-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.properties-value {
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.properties-input,
+.properties-select,
+.properties-textarea {
+  padding: 5px 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+}
+
+.properties-input:focus,
+.properties-select:focus,
+.properties-textarea:focus {
+  border-color: var(--accent);
+}
+
+.properties-textarea {
+  resize: vertical;
+  font-family: inherit;
+}
+
+.properties-color-chip {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}
+
+.properties-delete-btn {
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--danger);
+  border-radius: 4px;
+  color: var(--danger);
+  font-size: 12px;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.properties-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
