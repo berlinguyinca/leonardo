@@ -1099,3 +1099,130 @@ body {
 .properties-delete-btn:hover {
   background: rgba(239, 68, 68, 0.1);
 }
+
+/* Dual Pane View */
+.dual-pane-view {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+}
+
+.dual-pane-left,
+.dual-pane-right {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.resize-divider-v {
+  width: 4px;
+  flex-shrink: 0;
+  background: var(--border);
+  cursor: col-resize;
+  transition: background 0.15s;
+}
+
+.resize-divider-v:hover {
+  background: var(--accent);
+}
+
+.inline-editor-view {
+  height: 100%;
+}
+
+/* Timeline Minimap */
+.timeline-minimap {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.minimap-track {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 16px;
+}
+
+.minimap-track-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  width: 50px;
+  flex-shrink: 0;
+  text-transform: capitalize;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.minimap-track-bar {
+  flex: 1;
+  height: 8px;
+  position: relative;
+  background: var(--bg-secondary);
+  border-radius: 2px;
+}
+
+.minimap-segment {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: var(--bg-hover);
+  border-radius: 1px;
+}
+
+.minimap-sync-points {
+  position: relative;
+  height: 12px;
+  margin-top: 4px;
+}
+
+.minimap-sync-marker {
+  position: absolute;
+  top: 0;
+  width: 4px;
+  height: 100%;
+  border-radius: 1px;
+  opacity: 0.8;
+}
+
+/* Inline Text Popup */
+.inline-text-popup {
+  position: absolute;
+  z-index: 100;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  width: 300px;
+}
+
+.inline-text-input {
+  width: 100%;
+  padding: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  font-family: inherit;
+  outline: none;
+}
+
+.inline-text-input:focus {
+  border-color: var(--accent);
+}
+
+.inline-text-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.inline-text-buttons {
+  display: flex;
+  gap: 6px;
+}
