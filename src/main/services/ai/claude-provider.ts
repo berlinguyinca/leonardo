@@ -1,44 +1,42 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { v4 as uuid } from 'uuid'
 import type { IAIProvider } from '@shared/interfaces/ai-provider'
 import type { Script, ScriptGenContext } from '@shared/types/ai'
 import type { DOMEvent } from '@shared/types/events'
 import type { SyncPoint } from '@shared/types/timeline'
-import { v4 as uuidv4 } from 'uuid'
-import { buildScriptPrompt, getSystemPrompt } from './prompt-templates'
+import { getSystemPrompt, buildScriptPrompt } from './prompt-templates'
 import { parseScriptText } from './script-parser'
+import { runCLI, isCLIAvailable } from './cli-runner'
 
 export class ClaudeProvider implements IAIProvider {
-  readonly name = 'Claude'
-  private client: Anthropic | null = null
-  private apiKey: string
-  private model: string
+  readonly name = 'Claude (CLI)'
+  private readonly model: string
+  private readonly cliPath: string
 
-  constructor(apiKey: string, model = 'claude-sonnet-4-20250514') {
-    this.apiKey = apiKey
+  constructor(model = 'claude-sonnet-4-20250514', cliPath = 'claude') {
     this.model = model
+    this.cliPath = cliPath
   }
 
   get isAvailable(): boolean {
-    return this.apiKey.length > 0
+    return isCLIAvailable(this.cliPath)
   }
 
   async generateScript(prompt: string, context: ScriptGenContext): Promise<Script> {
-    const client = this.getClient()
-    const scriptId = uuidv4()
-    const userMessage = buildScriptPrompt(context)
+    const scriptId = uuid()
+    const userMessage = `${prompt}\n\n${buildScriptPrompt(context)}`
 
-    const response = await client.messages.create({
-      model: this.model,
-      max_tokens: 4096,
-      system: getSystemPrompt(),
-      messages: [{ role: 'user', content: userMessage }],
-    })
+    const args = [
+      '-p',
+      '--system-prompt', getSystemPrompt(),
+      '--output-format', 'text',
+      '--model', this.model,
+      '--no-session-persistence',
+      '--tools', '',
+      '--bare',
+    ]
 
-    const text = response.content
-      .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-      .map((block) => block.text)
-      .join('\n')
-
+    const result = await runCLI(this.cliPath, args, userMessage)
+    const text = result.stdout.trim()
     const sections = parseScriptText(text, scriptId)
 
     return {
@@ -52,54 +50,62 @@ export class ClaudeProvider implements IAIProvider {
   }
 
   async refineSyncPoints(script: Script, domEvents: DOMEvent[]): Promise<SyncPoint[]> {
-    const client = this.getClient()
+    const sectionsText = script.sections
+      .map((s, i) => `Section ${i + 1}: "${s.text.slice(0, 100)}..." (${s.startTime}ms - ${s.endTime}ms)`)
+      .join('\n')
 
-    const response = await client.messages.create({
-      model: this.model,
-      max_tokens: 2048,
-      system: 'You are a video sync point analyzer. Given a script and DOM events, identify optimal sync points for freeze frames, zoom-ins, and transitions. Output JSON array.',
-      messages: [
-        {
-          role: 'user',
-          content: `Script sections:\n${script.sections.map((s) => s.text).join('\n\n')}\n\nDOM events:\n${JSON.stringify(domEvents.slice(0, 50), null, 2)}\n\nReturn a JSON array of sync points with: timestamp, type (freeze/zoom/annotation/transition), duration, confidence (0-1).`,
-        },
-      ],
-    })
+    const eventsText = domEvents
+      .slice(0, 50)
+      .map((e) => `[${(e.timestamp / 1000).toFixed(1)}s] ${e.type} on ${e.elementSelector}`)
+      .join('\n')
 
-    const text = response.content
-      .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-      .map((block) => block.text)
-      .join('')
+    const userMessage = `Given these script sections:\n${sectionsText}\n\nAnd these DOM events:\n${eventsText}\n\nReturn a JSON array of sync points. Each sync point should have: timestamp (ms), type ("freeze"|"zoom"|"annotation"|"transition"), duration (ms), confidence (0-1). Only return the JSON array, no other text.`
+
+    const systemPrompt = 'You are a video sync point analyzer. Return only valid JSON arrays.'
+
+    const args = [
+      '-p',
+      '--system-prompt', systemPrompt,
+      '--output-format', 'text',
+      '--model', this.model,
+      '--no-session-persistence',
+      '--tools', '',
+      '--bare',
+    ]
 
     try {
-      const jsonMatch = text.match(/\[[\s\S]*\]/)
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0])
-      }
+      const result = await runCLI(this.cliPath, args, userMessage)
+      const jsonMatch = result.stdout.match(/\[[\s\S]*\]/)
+      if (!jsonMatch) return []
+
+      const raw = JSON.parse(jsonMatch[0]) as Array<{
+        timestamp: number
+        type: string
+        duration: number
+        confidence: number
+      }>
+
+      return raw.map((item) => ({
+        id: uuid(),
+        timelineId: '',
+        timestamp: item.timestamp,
+        type: item.type as SyncPoint['type'],
+        source: 'script' as const,
+        duration: item.duration ?? 0,
+        confidence: item.confidence ?? 0.5,
+      }))
     } catch {
-      // Failed to parse — return empty
+      return []
     }
-    return []
   }
 
   async testConnection(): Promise<boolean> {
     try {
-      const client = this.getClient()
-      await client.messages.create({
-        model: this.model,
-        max_tokens: 10,
-        messages: [{ role: 'user', content: 'ping' }],
-      })
-      return true
+      const args = ['-p', '--bare', '--tools', '', '--no-session-persistence', 'ping']
+      const result = await runCLI(this.cliPath, args, undefined, 30_000)
+      return result.stdout.length > 0
     } catch {
       return false
     }
-  }
-
-  private getClient(): Anthropic {
-    if (!this.client) {
-      this.client = new Anthropic({ apiKey: this.apiKey })
-    }
-    return this.client
   }
 }
