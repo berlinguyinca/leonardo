@@ -29,3 +29,16 @@ export const IPC_CHANNELS = {
   ARCHIVE_EXPORT: 'archive:export',
   ARCHIVE_IMPORT: 'archive:import',
 } as const
+
+export const TIMELINE_MIN_ZOOM = 0.1
+export const TIMELINE_MAX_ZOOM = 10
+export const TIMELINE_DEFAULT_ZOOM = 1
+export const TIMELINE_SNAP_THRESHOLD_PX = 10
+export const TIMELINE_SEGMENT_MIN_DURATION_MS = 100
+export const TIMELINE_EDGE_HIT_ZONE_PX = 6
+export const SYNC_POINT_COLORS: Record<string, string> = {
+  freeze: '#3b82f6',
+  zoom: '#22c55e',
+  annotation: '#f59e0b',
+  transition: '#a855f7',
+}

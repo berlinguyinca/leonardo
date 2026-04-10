@@ -10,9 +10,13 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['tests/**/*.test.ts'],
-    environment: 'node',
+    include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
     globals: true,
     testTimeout: 10_000,
+    environmentMatchGlobs: [
+      ['tests/integration/timeline-editor*', 'jsdom'],
+      ['tests/integration/script-editor*', 'jsdom'],
+      ['tests/integration/view-mode*', 'jsdom'],
+    ],
   },
 })
