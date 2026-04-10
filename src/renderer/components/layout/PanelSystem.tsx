@@ -2,6 +2,10 @@ import { useCallback, useRef } from 'react'
 import type { WorkspacePreset } from '../../stores/ui-store'
 import { useUIStore } from '../../stores/ui-store'
 import { RecordingBrowser } from '../browser/RecordingBrowser'
+import { PropertiesPanel } from '../properties/PropertiesPanel'
+import { ScriptOnlyView } from '../script-editor/ScriptOnlyView'
+import { DualPaneView } from '../script-editor/DualPaneView'
+import { InlineEditorView } from '../script-editor/InlineEditorView'
 
 interface PanelSystemProps {
   preset: WorkspacePreset
@@ -12,6 +16,8 @@ export function PanelSystem({ preset }: PanelSystemProps): React.ReactNode {
   const setSidebarWidth = useUIStore((s) => s.setSidebarWidth)
   const timelineHeight = useUIStore((s) => s.timelineHeight)
   const setTimelineHeight = useUIStore((s) => s.setTimelineHeight)
+
+  const editorView = useUIStore((s) => s.editorView)
 
   const isDraggingSidebar = useRef(false)
   const isDraggingTimeline = useRef(false)
@@ -79,7 +85,7 @@ export function PanelSystem({ preset }: PanelSystemProps): React.ReactNode {
           <div className="panel panel-properties">
             <div className="panel-header">Properties</div>
             <div className="panel-content">
-              <p className="panel-placeholder">Properties Panel</p>
+              <PropertiesPanel />
             </div>
           </div>
         </div>
@@ -89,9 +95,16 @@ export function PanelSystem({ preset }: PanelSystemProps): React.ReactNode {
 
         {/* Bottom Section - Timeline */}
         <div className="panel panel-timeline" style={{ height: timelineHeight }}>
-          <div className="panel-header">Timeline</div>
           <div className="panel-content">
-            <p className="panel-placeholder">Multi-Track Timeline Editor</p>
+            {editorView === 'script-only' && (
+              <ScriptOnlyView sections={[]} onUpdateSection={() => {}} />
+            )}
+            {editorView === 'dual-pane' && (
+              <DualPaneView sections={[]} onUpdateSection={() => {}} />
+            )}
+            {editorView === 'inline' && (
+              <InlineEditorView />
+            )}
           </div>
         </div>
       </div>
