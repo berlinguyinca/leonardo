@@ -4,6 +4,12 @@ export type Theme = 'dark' | 'light'
 export type WorkspacePreset = 'recording' | 'editing' | 'export'
 export type EditorView = 'script-only' | 'dual-pane' | 'inline'
 
+interface PanelSnapshot {
+  sidebarCollapsed: boolean
+  propertiesCollapsed: boolean
+  timelineCollapsed: boolean
+}
+
 interface UIState {
   theme: Theme
   workspacePreset: WorkspacePreset
@@ -11,6 +17,10 @@ interface UIState {
   showProjectWizard: boolean
   sidebarWidth: number
   timelineHeight: number
+  sidebarCollapsed: boolean
+  propertiesCollapsed: boolean
+  timelineCollapsed: boolean
+  panelStateBeforeRecording: PanelSnapshot | null
 
   setTheme: (theme: Theme) => void
   setWorkspacePreset: (preset: WorkspacePreset) => void
@@ -18,6 +28,11 @@ interface UIState {
   setShowProjectWizard: (show: boolean) => void
   setSidebarWidth: (width: number) => void
   setTimelineHeight: (height: number) => void
+  setSidebarCollapsed: (collapsed: boolean) => void
+  setPropertiesCollapsed: (collapsed: boolean) => void
+  setTimelineCollapsed: (collapsed: boolean) => void
+  collapseAllPanels: () => void
+  restorePanelState: () => void
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -27,6 +42,10 @@ export const useUIStore = create<UIState>((set) => ({
   showProjectWizard: false,
   sidebarWidth: 260,
   timelineHeight: 300,
+  sidebarCollapsed: false,
+  propertiesCollapsed: false,
+  timelineCollapsed: false,
+  panelStateBeforeRecording: null,
 
   setTheme: (theme) => set({ theme }),
   setWorkspacePreset: (preset) => set({ workspacePreset: preset }),
@@ -34,4 +53,28 @@ export const useUIStore = create<UIState>((set) => ({
   setShowProjectWizard: (show) => set({ showProjectWizard: show }),
   setSidebarWidth: (width) => set({ sidebarWidth: width }),
   setTimelineHeight: (height) => set({ timelineHeight: height }),
+  setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
+  setPropertiesCollapsed: (collapsed) => set({ propertiesCollapsed: collapsed }),
+  setTimelineCollapsed: (collapsed) => set({ timelineCollapsed: collapsed }),
+  collapseAllPanels: () =>
+    set((state) => ({
+      panelStateBeforeRecording: {
+        sidebarCollapsed: state.sidebarCollapsed,
+        propertiesCollapsed: state.propertiesCollapsed,
+        timelineCollapsed: state.timelineCollapsed,
+      },
+      sidebarCollapsed: true,
+      propertiesCollapsed: true,
+      timelineCollapsed: true,
+    })),
+  restorePanelState: () =>
+    set((state) => {
+      if (!state.panelStateBeforeRecording) return state
+      return {
+        sidebarCollapsed: state.panelStateBeforeRecording.sidebarCollapsed,
+        propertiesCollapsed: state.panelStateBeforeRecording.propertiesCollapsed,
+        timelineCollapsed: state.panelStateBeforeRecording.timelineCollapsed,
+        panelStateBeforeRecording: null,
+      }
+    }),
 }))

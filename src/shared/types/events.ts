@@ -21,3 +21,14 @@ export interface Recording {
   resolution: { width: number; height: number }
   createdAt: string
 }
+
+export interface Clip {
+  id: string
+  projectId: string
+  filePath: string
+  duration: number
+  url: string
+  resolution: { width: number; height: number }
+  createdAt: string
+  label: string
+}

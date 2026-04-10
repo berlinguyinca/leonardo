@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRecordingStore } from '../../stores/recording-store'
+import { useUIStore } from '../../stores/ui-store'
+import { useLibraryStore } from '../../stores/library-store'
+import type { Clip } from '@shared/types/events'
 
 interface RecordingControlsProps {
   webviewRef: React.RefObject<Electron.WebviewTag | null>
@@ -18,6 +21,14 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
   const setStatus = useRecordingStore((s) => s.setStatus)
   const recordingDuration = useRecordingStore((s) => s.recordingDuration)
   const setRecordingDuration = useRecordingStore((s) => s.setRecordingDuration)
+
+  const collapseAllPanels = useUIStore((s) => s.collapseAllPanels)
+  const restorePanelState = useUIStore((s) => s.restorePanelState)
+  const currentUrl = useRecordingStore((s) => s.currentUrl)
+  const targetResolution = useRecordingStore((s) => s.targetResolution)
+  const addClip = useLibraryStore((s) => s.addClip)
+  const setHighlightedClip = useLibraryStore((s) => s.setHighlightedClip)
+  const clipCount = useLibraryStore((s) => s.clips.length)
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const startTimeRef = useRef<number>(0)
@@ -46,12 +57,13 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
     setRecordingDuration(0)
     setPausedDuration(0)
     startTimer()
+    collapseAllPanels()
 
     // Signal main process to begin capture
     await window.leonardo.recording.start({
       webviewId: webviewRef.current?.getWebContentsId() ?? -1,
     })
-  }, [setStatus, setRecordingDuration, startTimer, webviewRef])
+  }, [setStatus, setRecordingDuration, startTimer, collapseAllPanels, webviewRef])
 
   const handlePause = useCallback(() => {
     setStatus('paused')
@@ -72,9 +84,26 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
     stopTimer()
     setStatus('processing')
 
-    await window.leonardo.recording.stop()
+    const result = await window.leonardo.recording.stop()
+
+    if (result.success && result.recordingId) {
+      const clip: Clip = {
+        id: result.recordingId,
+        projectId: '',
+        filePath: result.outputDir ? `${result.outputDir}/recording.webm` : '',
+        duration: result.duration ?? recordingDuration,
+        url: currentUrl,
+        resolution: { width: targetResolution.width, height: targetResolution.height },
+        createdAt: new Date().toISOString(),
+        label: `Recording ${clipCount + 1}`,
+      }
+      addClip(clip)
+      setHighlightedClip(clip.id)
+    }
+
+    restorePanelState()
     setStatus('idle')
-  }, [setStatus, stopTimer])
+  }, [setStatus, stopTimer, recordingDuration, currentUrl, targetResolution, clipCount, addClip, setHighlightedClip, restorePanelState])
 
   const isRecording = status === 'recording'
   const isPaused = status === 'paused'

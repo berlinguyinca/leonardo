@@ -6,6 +6,9 @@ import { PropertiesPanel } from '../properties/PropertiesPanel'
 import { ScriptOnlyView } from '../script-editor/ScriptOnlyView'
 import { DualPaneView } from '../script-editor/DualPaneView'
 import { InlineEditorView } from '../script-editor/InlineEditorView'
+import { ClipLibrary } from '../clip-library/ClipLibrary'
+
+const COLLAPSED_SIZE = 36
 
 interface PanelSystemProps {
   preset: WorkspacePreset
@@ -18,6 +21,13 @@ export function PanelSystem({ preset }: PanelSystemProps): React.ReactNode {
   const setTimelineHeight = useUIStore((s) => s.setTimelineHeight)
 
   const editorView = useUIStore((s) => s.editorView)
+
+  const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed)
+  const propertiesCollapsed = useUIStore((s) => s.propertiesCollapsed)
+  const timelineCollapsed = useUIStore((s) => s.timelineCollapsed)
+  const setSidebarCollapsed = useUIStore((s) => s.setSidebarCollapsed)
+  const setPropertiesCollapsed = useUIStore((s) => s.setPropertiesCollapsed)
+  const setTimelineCollapsed = useUIStore((s) => s.setTimelineCollapsed)
 
   const isDraggingSidebar = useRef(false)
   const isDraggingTimeline = useRef(false)
@@ -52,23 +62,40 @@ export function PanelSystem({ preset }: PanelSystemProps): React.ReactNode {
     [setSidebarWidth, setTimelineHeight],
   )
 
+  const effectiveTimelineHeight = timelineCollapsed ? COLLAPSED_SIZE : timelineHeight
+
   return (
     <div className="panel-system">
       {/* Left Sidebar - Clip Library */}
-      <aside className="panel panel-sidebar" style={{ width: sidebarWidth }}>
-        <div className="panel-header">Library</div>
-        <div className="panel-content">
-          <p className="panel-placeholder">Clip Library</p>
+      <aside
+        className={`panel panel-sidebar ${sidebarCollapsed ? 'panel-collapsed' : ''}`}
+        style={{ width: sidebarCollapsed ? COLLAPSED_SIZE : sidebarWidth }}
+      >
+        <div
+          className="panel-header panel-header-toggle"
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+        >
+          <span className={`collapse-chevron ${sidebarCollapsed ? 'chevron-right' : 'chevron-left'}`}>
+            {sidebarCollapsed ? '\u25B6' : '\u25C0'}
+          </span>
+          {!sidebarCollapsed && <span>Library</span>}
         </div>
+        {!sidebarCollapsed && (
+          <div className="panel-content">
+            <ClipLibrary />
+          </div>
+        )}
       </aside>
 
       {/* Sidebar Resize Handle */}
-      <div className="resize-handle resize-handle-v" onMouseDown={handleMouseDown('sidebar')} />
+      {!sidebarCollapsed && (
+        <div className="resize-handle resize-handle-v" onMouseDown={handleMouseDown('sidebar')} />
+      )}
 
       {/* Main Content Area */}
       <div className="panel-main">
         {/* Top Section - Browser/Preview + Properties */}
-        <div className="panel-top" style={{ height: `calc(100% - ${timelineHeight}px - 4px)` }}>
+        <div className="panel-top" style={{ height: `calc(100% - ${effectiveTimelineHeight}px - 4px)` }}>
           <div className="panel panel-preview">
             <div className="panel-header">
               {preset === 'recording' ? 'Browser' : 'Preview'}
@@ -82,30 +109,60 @@ export function PanelSystem({ preset }: PanelSystemProps): React.ReactNode {
             </div>
           </div>
 
-          <div className="panel panel-properties">
-            <div className="panel-header">Properties</div>
-            <div className="panel-content">
-              <PropertiesPanel />
+          {/* Properties Panel */}
+          <div
+            className={`panel panel-properties ${propertiesCollapsed ? 'panel-collapsed' : ''}`}
+            style={{ width: propertiesCollapsed ? COLLAPSED_SIZE : 300 }}
+          >
+            <div
+              className="panel-header panel-header-toggle"
+              onClick={() => setPropertiesCollapsed(!propertiesCollapsed)}
+            >
+              <span className={`collapse-chevron ${propertiesCollapsed ? 'chevron-left' : 'chevron-right'}`}>
+                {propertiesCollapsed ? '\u25C0' : '\u25B6'}
+              </span>
+              {!propertiesCollapsed && <span>Properties</span>}
             </div>
+            {!propertiesCollapsed && (
+              <div className="panel-content">
+                <PropertiesPanel />
+              </div>
+            )}
           </div>
         </div>
 
         {/* Timeline Resize Handle */}
-        <div className="resize-handle resize-handle-h" onMouseDown={handleMouseDown('timeline')} />
+        {!timelineCollapsed && (
+          <div className="resize-handle resize-handle-h" onMouseDown={handleMouseDown('timeline')} />
+        )}
 
         {/* Bottom Section - Timeline */}
-        <div className="panel panel-timeline" style={{ height: timelineHeight }}>
-          <div className="panel-content">
-            {editorView === 'script-only' && (
-              <ScriptOnlyView sections={[]} onUpdateSection={() => {}} />
-            )}
-            {editorView === 'dual-pane' && (
-              <DualPaneView sections={[]} onUpdateSection={() => {}} />
-            )}
-            {editorView === 'inline' && (
-              <InlineEditorView />
-            )}
+        <div
+          className={`panel panel-timeline ${timelineCollapsed ? 'panel-collapsed' : ''}`}
+          style={{ height: effectiveTimelineHeight }}
+        >
+          <div
+            className="panel-header panel-header-toggle"
+            onClick={() => setTimelineCollapsed(!timelineCollapsed)}
+          >
+            <span className={`collapse-chevron ${timelineCollapsed ? 'chevron-up' : 'chevron-down'}`}>
+              {timelineCollapsed ? '\u25B2' : '\u25BC'}
+            </span>
+            <span>Timeline</span>
           </div>
+          {!timelineCollapsed && (
+            <div className="panel-content">
+              {editorView === 'script-only' && (
+                <ScriptOnlyView sections={[]} onUpdateSection={() => {}} />
+              )}
+              {editorView === 'dual-pane' && (
+                <DualPaneView sections={[]} onUpdateSection={() => {}} />
+              )}
+              {editorView === 'inline' && (
+                <InlineEditorView />
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

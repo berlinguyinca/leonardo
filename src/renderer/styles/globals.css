@@ -222,6 +222,33 @@ body {
   font-size: 14px;
 }
 
+/* Panel Collapse */
+.panel-collapsed {
+  overflow: hidden;
+}
+
+.panel-collapsed .panel-content {
+  display: none;
+}
+
+.panel-header-toggle {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+
+.panel-header-toggle:hover {
+  color: var(--text);
+}
+
+.collapse-chevron {
+  font-size: 8px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
 /* Resize Handles */
 .resize-handle {
   flex-shrink: 0;
@@ -1225,4 +1252,44 @@ body {
 .inline-text-buttons {
   display: flex;
   gap: 6px;
+}
+
+/* Clip Library */
+.clip-library {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.clip-card {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--bg-panel-header);
+  border: 1px solid var(--border);
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.clip-card.clip-highlighted {
+  border-color: var(--accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.clip-card-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.clip-card-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.clip-card-date {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 4px;
 }
