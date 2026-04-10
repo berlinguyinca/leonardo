@@ -1,6 +1,7 @@
 import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'path'
 import { registerProjectIPC } from './ipc/project.ipc'
+import { initDatabase, closeDatabase } from './services/project-store'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -39,6 +40,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  initDatabase()
   registerProjectIPC()
   createWindow()
 
@@ -53,4 +55,8 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+app.on('will-quit', () => {
+  closeDatabase()
 })

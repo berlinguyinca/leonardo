@@ -10,9 +10,9 @@ function getDbPath(): string {
   return join(app.getPath('userData'), DB_FILENAME)
 }
 
-export function initDatabase(): Database.Database {
+export function initDatabase(dbPath?: string): Database.Database {
   if (db) return db
-  db = new Database(getDbPath())
+  db = new Database(dbPath ?? getDbPath())
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
   runMigrations(db)

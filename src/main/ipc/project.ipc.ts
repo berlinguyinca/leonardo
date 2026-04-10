@@ -1,52 +1,77 @@
-import { ipcMain } from 'electron'
+import { ipcMain, dialog } from 'electron'
 import { IPC_CHANNELS } from '@shared/constants'
 import type { Project, InputModeType, Resolution } from '@shared/types/project'
-
-// In-memory store until SQLite is set up (Task 3)
-const projects: Map<string, Project> = new Map()
+import { v4 as uuidv4 } from 'uuid'
+import * as projectStore from '../services/project-store'
+import { exportArchive, importArchive } from '../services/archive'
 
 export function registerProjectIPC(): void {
   ipcMain.handle(
     IPC_CHANNELS.PROJECT_CREATE,
     async (_event, args: { name: string; inputMode: InputModeType; resolution: Resolution }) => {
-      const { v4: uuidv4 } = await import('uuid')
-      const project: Project = {
-        id: uuidv4(),
-        name: args.name,
-        inputMode: args.inputMode,
-        status: 'draft',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        recordingResolution: args.resolution,
-        exportConfig: null,
-      }
-      projects.set(project.id, project)
-      return project
+      return projectStore.createProject(uuidv4(), args.name, args.inputMode, args.resolution)
     },
   )
 
   ipcMain.handle(IPC_CHANNELS.PROJECT_GET, async (_event, id: string) => {
-    return projects.get(id) ?? null
+    return projectStore.getProject(id)
   })
 
   ipcMain.handle(IPC_CHANNELS.PROJECT_LIST, async () => {
-    return Array.from(projects.values()).sort(
-      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-    )
+    return projectStore.listProjects()
   })
 
   ipcMain.handle(
     IPC_CHANNELS.PROJECT_UPDATE,
     async (_event, args: { id: string; updates: Partial<Project> }) => {
-      const project = projects.get(args.id)
-      if (!project) return null
-      const updated = { ...project, ...args.updates, updatedAt: new Date().toISOString() }
-      projects.set(args.id, updated)
-      return updated
+      return projectStore.updateProject(args.id, args.updates)
     },
   )
 
   ipcMain.handle(IPC_CHANNELS.PROJECT_DELETE, async (_event, id: string) => {
-    return projects.delete(id)
+    return projectStore.deleteProject(id)
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.ARCHIVE_EXPORT,
+    async (
+      _event,
+      args: {
+        projectId: string
+        mediaFiles: string[]
+        thumbnailFiles: string[]
+        settings: Record<string, unknown>
+      },
+    ) => {
+      const result = await dialog.showSaveDialog({
+        defaultPath: `project${'.leonardo'}`,
+        filters: [{ name: 'Leonardo Project', extensions: ['leonardo'] }],
+      })
+      if (result.canceled || !result.filePath) return null
+
+      const dbPath = projectStore.getDatabase().name
+      return exportArchive({
+        projectId: args.projectId,
+        dbPath,
+        mediaFiles: args.mediaFiles,
+        thumbnailFiles: args.thumbnailFiles,
+        settings: args.settings,
+        outputPath: result.filePath,
+      })
+    },
+  )
+
+  ipcMain.handle(IPC_CHANNELS.ARCHIVE_IMPORT, async () => {
+    const result = await dialog.showOpenDialog({
+      filters: [{ name: 'Leonardo Project', extensions: ['leonardo'] }],
+      properties: ['openFile'],
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+
+    const { app } = require('electron')
+    const { join } = require('path')
+    const extractDir = join(app.getPath('userData'), 'imports', uuidv4())
+
+    return importArchive(result.filePaths[0], extractDir)
   })
 }
