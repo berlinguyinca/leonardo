@@ -29,7 +29,6 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
   const targetResolution = useRecordingStore((s) => s.targetResolution)
   const addClip = useLibraryStore((s) => s.addClip)
   const setHighlightedClip = useLibraryStore((s) => s.setHighlightedClip)
-  const clipCount = useLibraryStore((s) => s.clips.length)
   const addClipToTimeline = useTimelineStore((s) => s.addClipToTimeline)
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -92,28 +91,30 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
   const handleStop = useCallback(async () => {
     stopTimer()
     setStatus('processing')
+    try {
+      const result = await window.leonardo.recording.stop()
 
-    const result = await window.leonardo.recording.stop()
-
-    if (result.success && result.recordingId) {
-      const clip: Clip = {
-        id: result.recordingId,
-        projectId: '',
-        filePath: result.outputDir ? `${result.outputDir}/recording.webm` : '',
-        duration: result.duration ?? recordingDuration,
-        url: currentUrl,
-        resolution: { width: targetResolution.width, height: targetResolution.height },
-        createdAt: new Date().toISOString(),
-        label: `Recording ${clipCount + 1}`,
+      if (result.success && result.recordingId) {
+        const currentClipCount = useLibraryStore.getState().clips.length
+        const clip: Clip = {
+          id: result.recordingId,
+          projectId: '',
+          filePath: result.outputDir ? `${result.outputDir}/recording.webm` : '',
+          duration: result.duration ?? recordingDuration,
+          url: currentUrl,
+          resolution: { width: targetResolution.width, height: targetResolution.height },
+          createdAt: new Date().toISOString(),
+          label: `Recording ${currentClipCount + 1}`,
+        }
+        addClip(clip)
+        setHighlightedClip(clip.id)
+        setPendingClip(clip)
       }
-      addClip(clip)
-      setHighlightedClip(clip.id)
-      setPendingClip(clip)
+    } finally {
+      restorePanelState()
+      setStatus('idle')
     }
-
-    restorePanelState()
-    setStatus('idle')
-  }, [setStatus, stopTimer, recordingDuration, currentUrl, targetResolution, clipCount, addClip, setHighlightedClip, restorePanelState])
+  }, [setStatus, stopTimer, recordingDuration, currentUrl, targetResolution, addClip, setHighlightedClip, restorePanelState])
 
   const isRecording = status === 'recording'
   const isPaused = status === 'paused'
