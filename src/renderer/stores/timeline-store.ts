@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { temporal } from 'zundo'
-import type { SyncTimeline, SyncPoint, Track, Segment } from '@shared/types'
-import type { Clip } from '@shared/types/events'
+import type { SyncTimeline, SyncPoint, Track, Segment, Clip } from '@shared/types'
 import { UNDO_HISTORY_LIMIT } from '@shared/constants'
 
 interface TimelineState {
@@ -106,7 +105,7 @@ export const useTimelineStore = create<TimelineState>()(
           if (insertTimeMs !== undefined) {
             startTime = insertTimeMs
           } else if (existingTrack && existingTrack.segments.length > 0) {
-            startTime = Math.max(...existingTrack.segments.map((s) => s.endTime))
+            startTime = existingTrack.segments.reduce((max, s) => Math.max(max, s.endTime), 0)
           } else {
             startTime = 0
           }

@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useTimelineStore } from '../../src/renderer/stores/timeline-store'
-import type { SyncTimeline, Track, Segment } from '@shared/types'
-import type { Clip } from '@shared/types/events'
+import type { SyncTimeline, Track, Segment, Clip } from '@shared/types'
 
 function makeTimeline(overrides: Partial<SyncTimeline> = {}): SyncTimeline {
   return {
@@ -205,6 +204,26 @@ describe('timeline-store: addClipToTimeline', () => {
     const newSeg = tracks[0].segments[0]
     expect(newSeg.startTime).toBe(0)
     expect(newSeg.endTime).toBe(2000)
+  })
+
+  it('allows insertion at insertTimeMs even if it overlaps existing segment', () => {
+    // existing segment from 0ms to 3000ms
+    const existingSegment = makeSegment({ startTime: 0, endTime: 3000 })
+    const existingTrack = makeTrack({ id: 'track-1', type: 'clip', segments: [existingSegment] })
+    const timeline = makeTimeline({ tracks: [existingTrack] })
+    useTimelineStore.setState({ timeline })
+
+    // insert new clip at 1000ms with 2000ms duration → segment 1000–3000ms (overlaps)
+    // overlap is allowed — caller is responsible
+    const clip = makeClip({ duration: 2000 })
+    useTimelineStore.getState().addClipToTimeline(clip, 1000)
+
+    const tracks = useTimelineStore.getState().timeline!.tracks
+    expect(tracks[0].segments).toHaveLength(2)
+
+    const newSeg = tracks[0].segments[1]
+    expect(newSeg.startTime).toBe(1000)
+    expect(newSeg.endTime).toBe(3000)
   })
 
   it('creates unique ids for segment and track', () => {
