@@ -6,9 +6,9 @@ export type AIMode = 'cloud' | 'local'
 export interface AIBackendConfig {
   provider: AIProviderType
   mode: AIMode
-  apiKey?: string
   model?: string
   ollamaBaseUrl?: string
+  cliPath?: string
 }
 
 export interface ScriptGenContext {

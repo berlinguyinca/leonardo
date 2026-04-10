@@ -7,9 +7,9 @@ import { OllamaProvider } from './ollama-provider'
 export function createAIProvider(config: AIBackendConfig): IAIProvider {
   switch (config.provider) {
     case 'claude':
-      return new ClaudeProvider(config.apiKey ?? '', config.model)
+      return new ClaudeProvider(config.model, config.cliPath)
     case 'openai':
-      return new OpenAIProvider(config.apiKey ?? '', config.model)
+      return new OpenAIProvider(config.model, config.cliPath)
     case 'ollama':
       return new OllamaProvider(config.model, config.ollamaBaseUrl)
     default:

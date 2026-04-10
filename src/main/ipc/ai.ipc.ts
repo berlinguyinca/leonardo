@@ -1,10 +1,9 @@
-import { ipcMain, safeStorage } from 'electron'
+import { ipcMain } from 'electron'
 import { IPC_CHANNELS } from '@shared/constants'
 import type { AIBackendConfig, ScriptGenContext, Script } from '@shared/types/ai'
 import type { DOMEvent } from '@shared/types/events'
 import type { SyncPoint } from '@shared/types/timeline'
 import { createAIProvider } from '../services/ai'
-import { getDatabase } from '../services/project-store'
 
 export function registerAIIPC(): void {
   ipcMain.handle(
@@ -73,34 +72,4 @@ export function registerAIIPC(): void {
     },
   )
 
-  // Secure API key storage
-  ipcMain.handle(
-    'ai:store-api-key',
-    async (_event, args: { provider: string; apiKey: string }): Promise<boolean> => {
-      try {
-        const db = getDatabase()
-        const encrypted = safeStorage.encryptString(args.apiKey).toString('base64')
-        db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
-          .run(`apikey_${args.provider}`, encrypted)
-        return true
-      } catch {
-        return false
-      }
-    },
-  )
-
-  ipcMain.handle(
-    'ai:get-api-key',
-    async (_event, provider: string): Promise<string> => {
-      try {
-        const db = getDatabase()
-        const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(`apikey_${provider}`) as { value: string } | undefined
-        if (!row) return ''
-        const decrypted = safeStorage.decryptString(Buffer.from(row.value, 'base64'))
-        return decrypted
-      } catch {
-        return ''
-      }
-    },
-  )
 }
