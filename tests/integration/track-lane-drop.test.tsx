@@ -107,6 +107,16 @@ describe('TrackLane drop target (integration)', () => {
 
       expect(evt.dataTransfer.dropEffect).toBe('copy')
     })
+
+    it('does NOT call preventDefault on dragover when track is locked', () => {
+      const lockedTrack = makeTrack({ locked: true })
+      const { container } = render(<TrackLane {...defaultProps} track={lockedTrack} />)
+      const trackContent = container.querySelector('.track-content')!
+
+      const evt = dispatchDragOverEvent(trackContent)
+
+      expect(evt.defaultPrevented).toBe(false)
+    })
   })
 
   describe('onDrop', () => {
@@ -212,6 +222,28 @@ describe('TrackLane drop target (integration)', () => {
       })
 
       dispatchDropEvent(trackContent, 200, () => '')
+
+      expect(addClipToTimelineMock).not.toHaveBeenCalled()
+    })
+
+    it('does NOT call addClipToTimeline when dropped on a locked track', () => {
+      const clip = makeClip({ id: 'clip-locked' })
+      useLibraryStore.setState({ clips: [clip], highlightedClipId: null })
+
+      const lockedTrack = makeTrack({ locked: true })
+      const { container } = render(
+        <TrackLane {...defaultProps} track={lockedTrack} zoomLevel={1} scrollOffset={0} />,
+      )
+      const trackContent = container.querySelector('.track-content')!
+
+      Object.defineProperty(trackContent, 'getBoundingClientRect', {
+        value: () => ({ left: 0, top: 0, right: 400, bottom: 60, width: 400, height: 60 }),
+        configurable: true,
+      })
+
+      dispatchDropEvent(trackContent, 200, (type) =>
+        type === 'application/clip-id' ? 'clip-locked' : '',
+      )
 
       expect(addClipToTimelineMock).not.toHaveBeenCalled()
     })

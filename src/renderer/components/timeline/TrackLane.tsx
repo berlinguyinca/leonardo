@@ -30,12 +30,14 @@ export function TrackLane({
   const addClipToTimeline = useTimelineStore((state) => state.addClipToTimeline)
 
   function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {
+    if (track.locked) return
     e.preventDefault()
     e.dataTransfer.dropEffect = 'copy'
   }
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>): void {
     e.preventDefault()
+    if (track.locked) return
     const clipId = e.dataTransfer.getData('application/clip-id')
     const clip = clips.find((c) => c.id === clipId)
     if (!clip) return
@@ -43,7 +45,7 @@ export function TrackLane({
     const rect = trackContentRef.current?.getBoundingClientRect()
     if (!rect) return
 
-    const insertTime = pixelToTime(e.clientX - rect.left, zoomLevel, scrollOffset)
+    const insertTime = Math.max(0, pixelToTime(e.clientX - rect.left, zoomLevel, scrollOffset))
     addClipToTimeline(clip, insertTime)
   }
 
