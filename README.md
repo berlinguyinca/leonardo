@@ -15,11 +15,11 @@ The tool records your screen while capturing DOM events, generates narration scr
 
 ### AI Script Generation
 
-- **Claude** (Anthropic SDK) — Cloud AI, highest quality
-- **OpenAI** — Cloud alternative
-- **Ollama** — Local AI, works offline
+- **Claude** — via `claude` CLI binary (no API key needed)
+- **OpenAI** — via `codex` CLI binary (no API key needed)
+- **Ollama** — Local AI via HTTP, works fully offline
 
-Scripts include timing markers: `[PAUSE]`, `[ZOOM selector]`, `[FREEZE duration]`, `[TRANSITION type]`
+No API key management required — the CLI tools handle their own authentication. Scripts include timing markers: `[PAUSE]`, `[ZOOM selector]`, `[FREEZE duration]`, `[TRANSITION type]`
 
 ### Text-to-Speech Pipeline
 
@@ -83,7 +83,7 @@ Switch between views via toolbar segmented control or `Cmd+1/2/3`.
 | Drag & Drop | @dnd-kit (structural) + raw pointer events (timeline) |
 | Event Bus | mitt |
 | Database | better-sqlite3 (SQLite, WAL mode) |
-| AI | @anthropic-ai/sdk, openai, Ollama REST |
+| AI | `claude` CLI, `codex` CLI, Ollama REST |
 | TTS | Piper (local), ElevenLabs (cloud) |
 | Video | FFmpeg (child process) |
 | Archive | adm-zip |
@@ -91,14 +91,14 @@ Switch between views via toolbar segmented control or `Cmd+1/2/3`.
 
 ## Project Status
 
-Phases 1-6 are complete with 211 tests passing:
+Phases 1-6 are complete with 218 tests passing:
 
 | Phase | Status | Description |
 |-------|--------|-------------|
 | 1 | Done | Foundation: Electron scaffold, SQLite, types, interfaces, archive format, auto-save |
 | 2 | Done | Recording Engine: Embedded webview browser, DOM event capture, FFmpeg conversion |
 | 2.5 | Done | FFmpeg Spike: Filtergraph builder (freeze, zoom, fade, overlay, audio mix) |
-| 3 | Done | AI Script Generation: Claude, OpenAI, Ollama providers with secure API key storage |
+| 3 | Done | AI Script Generation: Claude CLI, Codex CLI, Ollama providers (no API keys needed) |
 | 4 | Done | TTS Pipeline: Piper + ElevenLabs providers, SHA-256 caching |
 | 5 | Done | Sync Engine: DOM-to-sync conversion, conflict resolution, narration adjustment |
 | 6 | Done | Timeline Editor & Script Editor: Multi-track timeline, 3 editor views, properties panel |
@@ -111,6 +111,8 @@ Phases 1-6 are complete with 211 tests passing:
 - **Node.js** 20+ and npm
 - **Git**
 - **FFmpeg** (for rendering) — install via `brew install ffmpeg` (macOS) or your system package manager
+- **Claude CLI** (for Claude AI) — install [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
+- **Codex CLI** (for OpenAI) — install [OpenAI Codex](https://github.com/openai/codex)
 - **Piper** (optional, for local TTS) — see [Piper releases](https://github.com/rhasspy/piper/releases)
 - **Ollama** (optional, for local AI) — see [ollama.com](https://ollama.com)
 
@@ -203,16 +205,16 @@ leonardo/
 
 ### AI Providers
 
-API keys are stored securely via Electron's safeStorage API.
+Leonardo invokes AI tools as local CLI binaries — no API keys are stored or managed by the app.
 
 **Claude (recommended):**
-Set your Anthropic API key in the app settings. Uses claude-sonnet for script generation.
+Install the `claude` CLI and authenticate it once (`claude login`). Leonardo invokes `claude -p` in non-interactive mode with `--bare` to generate scripts. Default model: `claude-sonnet-4-20250514`.
 
-**OpenAI:**
-Set your OpenAI API key. Uses gpt-4 for script generation.
+**OpenAI (Codex):**
+Install the `codex` CLI and authenticate it once. Leonardo invokes `codex exec` in sandbox mode. Default model: `gpt-4o`.
 
 **Ollama (offline):**
-Install Ollama and pull a model (e.g., `ollama pull llama3`). Leonardo connects to `localhost:11434` by default.
+Install Ollama and pull a model (e.g., `ollama pull llama3`). Leonardo connects to `localhost:11434` by default. No CLI binary needed — uses HTTP API directly.
 
 ### TTS Providers
 
@@ -226,7 +228,7 @@ Set your ElevenLabs API key for high-quality cloud synthesis with voice cloning 
 
 The project follows strict testing practices:
 
-- **211 tests** across 22 test files
+- **218 tests** across 23 test files
 - **Unit tests** for pure functions (timeline math, snap logic, collision detection, script parsing, sync engine)
 - **Integration tests** use real dependencies — real Zustand stores, real SQLite databases, real component rendering. No `vi.mock()` in integration tests.
 - Tests run in ~2.5 seconds
