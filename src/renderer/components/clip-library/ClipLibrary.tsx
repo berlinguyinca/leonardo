@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useLibraryStore } from '../../stores/library-store'
+import { useTimelineStore } from '../../stores/timeline-store'
 
 function formatDuration(ms: number): string {
   const seconds = Math.floor(ms / 1000)
@@ -17,6 +18,7 @@ export function ClipLibrary(): React.ReactNode {
   const clips = useLibraryStore((s) => s.clips)
   const highlightedClipId = useLibraryStore((s) => s.highlightedClipId)
   const setHighlightedClip = useLibraryStore((s) => s.setHighlightedClip)
+  const addClipToTimeline = useTimelineStore((s) => s.addClipToTimeline)
 
   useEffect(() => {
     if (!highlightedClipId) return
@@ -38,6 +40,12 @@ export function ClipLibrary(): React.ReactNode {
         <div
           key={clip.id}
           className={`clip-card ${highlightedClipId === clip.id ? 'clip-highlighted' : ''}`}
+          draggable
+          onDoubleClick={() => addClipToTimeline(clip)}
+          onDragStart={(e) => {
+            e.dataTransfer.setData('application/clip-id', clip.id)
+            e.dataTransfer.effectAllowed = 'copy'
+          }}
         >
           <div className="clip-card-label">{clip.label}</div>
           <div className="clip-card-meta">
