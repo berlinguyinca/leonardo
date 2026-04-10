@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { temporal } from 'zundo'
-import type { SyncTimeline, SyncPoint, Track } from '@shared/types'
+import type { SyncTimeline, SyncPoint, Track, Segment } from '@shared/types'
+import type { Clip } from '@shared/types/events'
 import { UNDO_HISTORY_LIMIT } from '@shared/constants'
 
 interface TimelineState {
@@ -22,6 +23,7 @@ interface TimelineState {
   removeSyncPoint: (id: string) => void
   addTrack: (track: Track) => void
   removeTrack: (id: string) => void
+  addClipToTimeline: (clip: Clip, insertTimeMs?: number) => void
 }
 
 export const useTimelineStore = create<TimelineState>()(
@@ -89,6 +91,65 @@ export const useTimelineStore = create<TimelineState>()(
             timeline: {
               ...state.timeline,
               tracks: state.timeline.tracks.filter((t) => t.id !== id),
+            },
+          }
+        }),
+      addClipToTimeline: (clip, insertTimeMs) =>
+        set((state) => {
+          if (!state.timeline) return state
+
+          const existingTrack = state.timeline.tracks.find(
+            (t) => t.type === 'clip' || t.type === 'recording',
+          )
+
+          let startTime: number
+          if (insertTimeMs !== undefined) {
+            startTime = insertTimeMs
+          } else if (existingTrack && existingTrack.segments.length > 0) {
+            startTime = Math.max(...existingTrack.segments.map((s) => s.endTime))
+          } else {
+            startTime = 0
+          }
+
+          const trackId = existingTrack?.id ?? crypto.randomUUID()
+
+          const segment: Segment = {
+            id: crypto.randomUUID(),
+            trackId,
+            startTime,
+            endTime: startTime + clip.duration,
+            sourceFile: clip.filePath,
+            sourceOffset: 0,
+            label: clip.label,
+          }
+
+          if (existingTrack) {
+            return {
+              timeline: {
+                ...state.timeline,
+                tracks: state.timeline.tracks.map((t) =>
+                  t.id === existingTrack.id
+                    ? { ...t, segments: [...t.segments, segment] }
+                    : t,
+                ),
+              },
+            }
+          }
+
+          const newTrack: Track = {
+            id: trackId,
+            type: 'clip',
+            segments: [segment],
+            zOrder: 0,
+            label: 'Recordings',
+            muted: false,
+            locked: false,
+          }
+
+          return {
+            timeline: {
+              ...state.timeline,
+              tracks: [...state.timeline.tracks, newTrack],
             },
           }
         }),
