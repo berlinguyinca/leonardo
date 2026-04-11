@@ -48,6 +48,10 @@ export function ClipContextMenu({ clip, position, onClose }: ClipContextMenuProp
 
   async function handleGenerate() {
     if (!scriptPrompt.trim() || !window.leonardo?.ai) return
+    if (!activeProjectId) {
+      setGenError('No active project selected')
+      return
+    }
     setGenerating(true)
     setGenError(null)
     try {
@@ -129,9 +133,9 @@ export function ClipContextMenu({ clip, position, onClose }: ClipContextMenuProp
         )}
       </li>
       <li
-        onClick={() => {
+        onClick={async () => {
           if (window.leonardo?.clip) {
-            window.leonardo.clip.export(clip.id)
+            await window.leonardo.clip.export(clip.id)
           }
           onClose()
         }}
