@@ -5,21 +5,26 @@
 }
 
 :root {
-  /* Dark theme (default) */
-  --bg-primary: #1a1a2e;
-  --bg-secondary: #16213e;
-  --bg-panel: #1e293b;
-  --bg-panel-header: #0f172a;
-  --bg-hover: #334155;
-  --bg-active: #3b82f6;
-  --text-primary: #e2e8f0;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --border: #334155;
-  --border-active: #3b82f6;
-  --accent: #3b82f6;
-  --accent-hover: #2563eb;
-  --danger: #ef4444;
+  /* Dark theme (default) — DaVinci Resolve palette */
+  --bg-primary: #111111;
+  --bg-secondary: #161616;
+  --bg-panel: #1a1a1a;
+  --bg-panel-header: #141414;
+  --bg-hover: #252525;
+  --bg-active: #1d4a8a;
+  --text-primary: #d0d0d0;
+  --text-secondary: #888888;
+  --text-muted: #555555;
+  --border: #252525;
+  --border-active: #4a9eff;
+  --accent: #4a9eff;
+  --accent-hover: #3a8eef;
+  --accent-dim: rgba(74, 158, 255, 0.15);
+  --accent-border: rgba(74, 158, 255, 0.3);
+  --segment-video: linear-gradient(180deg, #1d5c9b 0%, #174a7e 100%);
+  --segment-audio: linear-gradient(180deg, #1a7040 0%, #145a33 100%);
+  --inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --danger: #ff453a;
   --success: #22c55e;
   --warning: #f59e0b;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -30,16 +35,23 @@
 
 [data-theme='light'] {
   --bg-primary: #f1f5f9;
-  --bg-secondary: #e2e8f0;
+  --bg-secondary: #e8ecf0;
   --bg-panel: #ffffff;
-  --bg-panel-header: #f8fafc;
+  --bg-panel-header: #f4f6f8;
   --bg-hover: #e2e8f0;
-  --bg-active: #3b82f6;
+  --bg-active: #1d4a8a;
   --text-primary: #0f172a;
   --text-secondary: #475569;
   --text-muted: #94a3b8;
   --border: #cbd5e1;
-  --border-active: #3b82f6;
+  --border-active: #4a9eff;
+  --accent: #4a9eff;
+  --accent-hover: #3a8eef;
+  --accent-dim: rgba(74, 158, 255, 0.1);
+  --accent-border: rgba(74, 158, 255, 0.3);
+  --segment-video: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+  --segment-audio: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
+  --inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 body {
