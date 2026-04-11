@@ -3,6 +3,7 @@ import { IPC_CHANNELS } from '@shared/constants'
 import type { Project, InputModeType, Resolution } from '@shared/types/project'
 import type { ArchiveImportResult } from '../main/services/archive'
 import type { Clip } from '@shared/types/events'
+import type { AIBackendConfig, Script, ScriptGenContext } from '@shared/types/ai'
 
 const api = {
   project: {
@@ -70,6 +71,17 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.CLIP_LIST),
     delete: (id: string): Promise<boolean> =>
       ipcRenderer.invoke(IPC_CHANNELS.CLIP_DELETE, id),
+    export: (id: string): Promise<{ success: boolean; outputPath?: string; error?: string }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLIP_EXPORT, id),
+  },
+  ai: {
+    generateScript: (args: {
+      config: AIBackendConfig
+      prompt: string
+      context: ScriptGenContext
+      projectId: string
+    }): Promise<{ success: boolean; script?: Script; error?: string }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_SCRIPT, args),
   },
   log: {
     read: (): Promise<string> =>
