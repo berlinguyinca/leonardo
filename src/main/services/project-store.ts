@@ -236,8 +236,14 @@ export function createClip(clip: Clip): Clip {
   return clip
 }
 
-export function listClips(): Clip[] {
+export function listClips(projectId?: string): Clip[] {
   const db = getDatabase()
+  if (projectId) {
+    const rows = db.prepare(
+      'SELECT * FROM clips WHERE project_id = ? ORDER BY created_at DESC',
+    ).all(projectId) as Record<string, unknown>[]
+    return rows.map(rowToClip)
+  }
   const rows = db.prepare('SELECT * FROM clips ORDER BY created_at DESC').all() as Record<string, unknown>[]
   return rows.map(rowToClip)
 }

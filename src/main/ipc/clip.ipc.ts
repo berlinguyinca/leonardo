@@ -10,8 +10,8 @@ export function registerClipIPC(): void {
     projectStore.createClip(clip),
   )
 
-  ipcMain.handle(IPC_CHANNELS.CLIP_LIST, async () =>
-    projectStore.listClips(),
+  ipcMain.handle(IPC_CHANNELS.CLIP_LIST, async (_event, projectId?: string) =>
+    projectStore.listClips(projectId),
   )
 
   ipcMain.handle(IPC_CHANNELS.CLIP_DELETE, async (_event, id: string) =>

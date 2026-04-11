@@ -128,5 +128,14 @@ describe('add to timeline — view navigation', () => {
       })
       expect(useUIStore.getState().timelineCollapsed).toBe(false)
     })
+
+    it('switches workspace to editing preset on "Edit Now"', async () => {
+      useUIStore.setState({ editorView: 'dual-pane', timelineCollapsed: true, workspacePreset: 'recording' })
+      await triggerStop()
+      act(() => {
+        fireEvent.click(screen.getByText('Edit Now'))
+      })
+      expect(useUIStore.getState().workspacePreset).toBe('editing')
+    })
   })
 })

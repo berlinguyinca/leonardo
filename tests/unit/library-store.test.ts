@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+// @vitest-environment jsdom
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useLibraryStore } from '../../src/renderer/stores/library-store'
 import type { Clip } from '@shared/types/events'
 
@@ -21,6 +22,50 @@ describe('library-store', () => {
     useLibraryStore.setState({
       clips: [],
       highlightedClipId: null,
+    })
+    // Reset window.leonardo bridge mock between tests
+    ;(window as unknown as Record<string, unknown>).leonardo = undefined
+  })
+
+  describe('loadClips', () => {
+    it('calls clip.list with projectId when provided', async () => {
+      const mockList = vi.fn().mockResolvedValue([])
+      ;(window as unknown as Record<string, unknown>).leonardo = {
+        clip: { list: mockList, create: vi.fn(), delete: vi.fn() },
+      }
+
+      await useLibraryStore.getState().loadClips('proj-1')
+
+      expect(mockList).toHaveBeenCalledWith('proj-1')
+    })
+
+    it('calls clip.list with undefined when no projectId given', async () => {
+      const mockList = vi.fn().mockResolvedValue([])
+      ;(window as unknown as Record<string, unknown>).leonardo = {
+        clip: { list: mockList, create: vi.fn(), delete: vi.fn() },
+      }
+
+      await useLibraryStore.getState().loadClips()
+
+      expect(mockList).toHaveBeenCalledWith(undefined)
+    })
+
+    it('sets clips in state from bridge result', async () => {
+      const clip = makeClip()
+      const mockList = vi.fn().mockResolvedValue([clip])
+      ;(window as unknown as Record<string, unknown>).leonardo = {
+        clip: { list: mockList, create: vi.fn(), delete: vi.fn() },
+      }
+
+      await useLibraryStore.getState().loadClips('proj-1')
+
+      expect(useLibraryStore.getState().clips).toEqual([clip])
+    })
+
+    it('does nothing when no bridge is present', async () => {
+      // window.leonardo is undefined (reset in beforeEach)
+      await expect(useLibraryStore.getState().loadClips('proj-1')).resolves.toBeUndefined()
+      expect(useLibraryStore.getState().clips).toHaveLength(0)
     })
   })
 

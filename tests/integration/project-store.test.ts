@@ -22,8 +22,25 @@ import {
   listProjects,
   updateProject,
   deleteProject,
+  createClip,
+  listClips,
 } from '@main/services/project-store'
 import type { Resolution } from '@shared/types/project'
+import type { Clip } from '@shared/types/events'
+
+function makeClip(overrides: Partial<Clip> = {}): Clip {
+  return {
+    id: 'clip-test',
+    projectId: '',
+    filePath: '/tmp/recording.webm',
+    duration: 5000,
+    url: 'https://example.com',
+    resolution: { width: 1920, height: 1080 },
+    createdAt: new Date().toISOString(),
+    label: 'Test Clip',
+    ...overrides,
+  }
+}
 
 describe('project-store (real SQLite)', () => {
   let tempDir: string
@@ -252,6 +269,52 @@ describe('project-store (real SQLite)', () => {
     })
   })
 
+
+  describe('listClips', () => {
+    it('returns all clips when no projectId is given', () => {
+      createProject('p-lc1', 'Project 1', 'record-first', resolution1080p)
+      createProject('p-lc2', 'Project 2', 'record-first', resolution1080p)
+      const clip1 = makeClip({ id: 'c-1', projectId: 'p-lc1', label: 'Clip A' })
+      const clip2 = makeClip({ id: 'c-2', projectId: 'p-lc2', label: 'Clip B' })
+      createClip(clip1)
+      createClip(clip2)
+
+      const all = listClips()
+      expect(all.length).toBe(2)
+    })
+
+    it('returns only clips for the specified project', () => {
+      createProject('p-lc3', 'Project 3', 'record-first', resolution1080p)
+      createProject('p-lc4', 'Project 4', 'record-first', resolution1080p)
+      const clip1 = makeClip({ id: 'c-3', projectId: 'p-lc3', label: 'Only Mine' })
+      const clip2 = makeClip({ id: 'c-4', projectId: 'p-lc4', label: 'Other Project' })
+      createClip(clip1)
+      createClip(clip2)
+
+      const filtered = listClips('p-lc3')
+      expect(filtered).toHaveLength(1)
+      expect(filtered[0].id).toBe('c-3')
+    })
+
+    it('does not include clips from other projects when filtered', () => {
+      createProject('p-lc5', 'Project 5', 'record-first', resolution1080p)
+      createProject('p-lc6', 'Project 6', 'record-first', resolution1080p)
+      const clip1 = makeClip({ id: 'c-5', projectId: 'p-lc5', label: 'Mine' })
+      const clip2 = makeClip({ id: 'c-6', projectId: 'p-lc6', label: 'Not Mine' })
+      createClip(clip1)
+      createClip(clip2)
+
+      const filtered = listClips('p-lc5')
+      const ids = filtered.map((c) => c.id)
+      expect(ids).not.toContain('c-6')
+    })
+
+    it('returns empty array when project has no clips', () => {
+      createProject('p-lc7', 'Empty Project', 'record-first', resolution1080p)
+      const result = listClips('p-lc7')
+      expect(result).toHaveLength(0)
+    })
+  })
   describe('database resilience', () => {
     it('getDatabase returns the same instance', () => {
       const db1 = getDatabase()

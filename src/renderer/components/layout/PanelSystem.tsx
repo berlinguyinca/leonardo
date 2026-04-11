@@ -135,13 +135,13 @@ export function PanelSystem({ preset }: PanelSystemProps): React.ReactNode {
           </div>
         </div>
 
-        {/* Timeline Resize Handle */}
-        {!timelineCollapsed && (
+        {/* Timeline Resize Handle — editing/export only */}
+        {preset !== 'recording' && !timelineCollapsed && (
           <div className="resize-handle resize-handle-h" onMouseDown={handleMouseDown('timeline')} />
         )}
 
-        {/* Bottom Section - Timeline */}
-        <div
+        {/* Bottom Section - Timeline — editing/export only */}
+        {preset !== 'recording' && <div
           className={`panel panel-timeline ${timelineCollapsed ? 'panel-collapsed' : ''}`}
           style={{ height: effectiveTimelineHeight }}
         >
@@ -167,7 +167,7 @@ export function PanelSystem({ preset }: PanelSystemProps): React.ReactNode {
               )}
             </div>
           )}
-        </div>
+        </div>}
       </div>
     </div>
   )

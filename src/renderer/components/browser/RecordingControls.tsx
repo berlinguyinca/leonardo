@@ -28,6 +28,7 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
   const restorePanelState = useUIStore((s) => s.restorePanelState)
   const setEditorView = useUIStore((s) => s.setEditorView)
   const setTimelineCollapsed = useUIStore((s) => s.setTimelineCollapsed)
+  const setWorkspacePreset = useUIStore((s) => s.setWorkspacePreset)
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
   const currentUrl = useRecordingStore((s) => s.currentUrl)
   const targetResolution = useRecordingStore((s) => s.targetResolution)
@@ -169,6 +170,7 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
           <button
             onClick={() => {
               addClipToTimeline(pendingClip)
+              setWorkspacePreset('editing')
               setEditorView('inline')
               setTimelineCollapsed(false)
               setPendingClip(null)

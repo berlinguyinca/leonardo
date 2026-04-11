@@ -37,7 +37,7 @@ export function Toolbar(): React.ReactNode {
       </nav>
 
       <div className="toolbar-right">
-        <ViewModeToggle />
+        {workspacePreset !== "recording" && <ViewModeToggle />}
         <button
           className="toolbar-btn"
           onClick={() => setShowLogViewer(true)}

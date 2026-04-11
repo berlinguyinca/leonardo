@@ -67,8 +67,8 @@ const api = {
   clip: {
     create: (clip: Clip): Promise<Clip> =>
       ipcRenderer.invoke(IPC_CHANNELS.CLIP_CREATE, clip),
-    list: (): Promise<Clip[]> =>
-      ipcRenderer.invoke(IPC_CHANNELS.CLIP_LIST),
+    list: (projectId?: string): Promise<Clip[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLIP_LIST, projectId),
     delete: (id: string): Promise<boolean> =>
       ipcRenderer.invoke(IPC_CHANNELS.CLIP_DELETE, id),
     export: (id: string): Promise<{ success: boolean; outputPath?: string; error?: string }> =>

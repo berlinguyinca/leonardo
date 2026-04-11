@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { Clip } from '@shared/types/events'
+import type { Project } from '@shared/types'
 import { useLibraryStore } from '../../stores/library-store'
 import { useTimelineStore } from '../../stores/timeline-store'
 import { useUIStore } from '../../stores/ui-store'
+import { useProjectStore } from '../../stores/project-store'
 import { ClipContextMenu } from './ClipContextMenu'
 
 function formatDuration(ms: number): string {
@@ -17,6 +19,27 @@ function truncateUrl(url: string, maxLength = 30): string {
   return url.slice(0, maxLength - 3) + '...'
 }
 
+function ProjectHeader({
+  projectId,
+  projects,
+  clipCount,
+}: {
+  projectId: string | null
+  projects: Project[]
+  clipCount: number
+}): React.ReactNode {
+  const project = projects.find((p) => p.id === projectId)
+  if (!project) {
+    return <div className="clip-library-project-header">No project selected</div>
+  }
+  return (
+    <div className="clip-library-project-header">
+      <span className="project-name">{project.name}</span>
+      <span className="clip-count">{clipCount} clip{clipCount !== 1 ? 's' : ''}</span>
+    </div>
+  )
+}
+
 export function ClipLibrary(): React.ReactNode {
   const clips = useLibraryStore((s) => s.clips)
   const highlightedClipId = useLibraryStore((s) => s.highlightedClipId)
@@ -25,11 +48,13 @@ export function ClipLibrary(): React.ReactNode {
   const addClipToTimeline = useTimelineStore((s) => s.addClipToTimeline)
   const setEditorView = useUIStore((s) => s.setEditorView)
   const setTimelineCollapsed = useUIStore((s) => s.setTimelineCollapsed)
+  const activeProjectId = useProjectStore((s) => s.activeProjectId)
+  const projects = useProjectStore((s) => s.projects)
   const [contextMenu, setContextMenu] = useState<{ clip: Clip; x: number; y: number } | null>(null)
 
   useEffect(() => {
-    loadClips()
-  }, [loadClips])
+    loadClips(activeProjectId ?? undefined)
+  }, [loadClips, activeProjectId])
 
   useEffect(() => {
     if (!highlightedClipId) return
@@ -37,45 +62,46 @@ export function ClipLibrary(): React.ReactNode {
     return () => clearTimeout(timer)
   }, [highlightedClipId, setHighlightedClip])
 
-  if (clips.length === 0) {
-    return (
-      <p className="panel-placeholder">
-        No clips yet. Start recording to add clips.
-      </p>
-    )
-  }
-
   return (
     <div className="clip-library">
-      {clips.map((clip) => (
-        <div
-          key={clip.id}
-          className={`clip-card ${highlightedClipId === clip.id ? 'clip-highlighted' : ''}`}
-          draggable
-          onDoubleClick={() => {
+      <ProjectHeader projectId={activeProjectId} projects={projects} clipCount={clips.length} />
+
+      {clips.length === 0 ? (
+        <p className="panel-placeholder">
+          No clips yet. Start recording to add clips.
+        </p>
+      ) : (
+        clips.map((clip) => (
+          <div
+            key={clip.id}
+            className={`clip-card ${highlightedClipId === clip.id ? 'clip-highlighted' : ''}`}
+            draggable
+            onDoubleClick={() => {
               addClipToTimeline(clip)
               setEditorView('inline')
               setTimelineCollapsed(false)
             }}
-          onContextMenu={(e) => {
-            e.preventDefault()
-            setContextMenu({ clip, x: e.clientX, y: e.clientY })
-          }}
-          onDragStart={(e) => {
-            e.dataTransfer.setData('application/clip-id', clip.id)
-            e.dataTransfer.effectAllowed = 'copy'
-          }}
-        >
-          <div className="clip-card-label">{clip.label}</div>
-          <div className="clip-card-meta">
-            <span>{formatDuration(clip.duration)}</span>
-            <span>{truncateUrl(clip.url)}</span>
+            onContextMenu={(e) => {
+              e.preventDefault()
+              setContextMenu({ clip, x: e.clientX, y: e.clientY })
+            }}
+            onDragStart={(e) => {
+              e.dataTransfer.setData('application/clip-id', clip.id)
+              e.dataTransfer.effectAllowed = 'copy'
+            }}
+          >
+            <div className="clip-card-label">{clip.label}</div>
+            <div className="clip-card-meta">
+              <span>{formatDuration(clip.duration)}</span>
+              <span>{truncateUrl(clip.url)}</span>
+            </div>
+            <div className="clip-card-date">
+              {new Date(clip.createdAt).toLocaleString()}
+            </div>
           </div>
-          <div className="clip-card-date">
-            {new Date(clip.createdAt).toLocaleString()}
-          </div>
-        </div>
-      ))}
+        ))
+      )}
+
       {contextMenu && (
         <ClipContextMenu
           clip={contextMenu.clip}
