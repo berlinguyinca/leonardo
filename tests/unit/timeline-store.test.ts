@@ -269,4 +269,28 @@ describe('timeline-store: addClipToTimeline', () => {
     const [seg1, seg2] = tracks[0].segments
     expect(seg1.id).not.toBe(seg2.id)
   })
+
+  it('sets timeline.duration to clip.duration when adding the first clip', () => {
+    const clip = makeClip({ duration: 10000 })
+    useTimelineStore.getState().addClipToTimeline(clip)
+    expect(useTimelineStore.getState().timeline!.duration).toBe(10000)
+  })
+
+  it('extends timeline.duration when appending a second clip', () => {
+    useTimelineStore.setState({ timeline: makeTimeline() })
+    const clip1 = makeClip({ id: 'c1', duration: 5000 })
+    const clip2 = makeClip({ id: 'c2', duration: 8000 })
+    useTimelineStore.getState().addClipToTimeline(clip1)
+    useTimelineStore.getState().addClipToTimeline(clip2)
+    // clip1: 0–5000, clip2: 5000–13000 → duration = 13000
+    expect(useTimelineStore.getState().timeline!.duration).toBe(13000)
+  })
+
+  it('sets timeline.duration correctly when insertTimeMs is provided', () => {
+    useTimelineStore.setState({ timeline: makeTimeline() })
+    const clip = makeClip({ duration: 4000 })
+    useTimelineStore.getState().addClipToTimeline(clip, 6000)
+    // segment: 6000–10000 → duration = 10000
+    expect(useTimelineStore.getState().timeline!.duration).toBe(10000)
+  })
 })

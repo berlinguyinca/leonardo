@@ -27,6 +27,10 @@ interface TimelineState {
   addClipToTimeline: (clip: Clip, insertTimeMs?: number) => void
 }
 
+function computeDuration(tracks: Track[]): number {
+  return tracks.flatMap((t) => t.segments).reduce((max, s) => Math.max(max, s.endTime), 0)
+}
+
 export const useTimelineStore = create<TimelineState>()(
   temporal(
     (set) => ({
@@ -136,14 +140,16 @@ export const useTimelineStore = create<TimelineState>()(
           }
 
           if (existingTrack) {
+            const updatedTracks = timeline.tracks.map((t) =>
+              t.id === existingTrack.id
+                ? { ...t, segments: [...t.segments, segment] }
+                : t,
+            )
             return {
               timeline: {
                 ...timeline,
-                tracks: timeline.tracks.map((t) =>
-                  t.id === existingTrack.id
-                    ? { ...t, segments: [...t.segments, segment] }
-                    : t,
-                ),
+                tracks: updatedTracks,
+                duration: computeDuration(updatedTracks),
               },
             }
           }
@@ -158,10 +164,12 @@ export const useTimelineStore = create<TimelineState>()(
             locked: false,
           }
 
+          const newTracks = [...timeline.tracks, newTrack]
           return {
             timeline: {
               ...timeline,
-              tracks: [...timeline.tracks, newTrack],
+              tracks: newTracks,
+              duration: computeDuration(newTracks),
             },
           }
         }),
