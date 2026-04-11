@@ -24,6 +24,7 @@ interface TimelineState {
   removeSyncPoint: (id: string) => void
   addTrack: (track: Track) => void
   removeTrack: (id: string) => void
+  removeSegment: (segmentId: string) => void
   addClipToTimeline: (clip: Clip, insertTimeMs?: number) => void
 }
 
@@ -98,6 +99,21 @@ export const useTimelineStore = create<TimelineState>()(
             timeline: {
               ...state.timeline,
               tracks: state.timeline.tracks.filter((t) => t.id !== id),
+            },
+          }
+        }),
+      removeSegment: (segmentId) =>
+        set((state) => {
+          if (!state.timeline) return state
+          const updatedTracks = state.timeline.tracks.map((t) => ({
+            ...t,
+            segments: t.segments.filter((s) => s.id !== segmentId),
+          }))
+          return {
+            timeline: {
+              ...state.timeline,
+              tracks: updatedTracks,
+              duration: computeDuration(updatedTracks),
             },
           }
         }),

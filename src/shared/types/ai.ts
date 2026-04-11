@@ -21,6 +21,7 @@ export interface ScriptGenContext {
 export interface Script {
   id: string
   projectId: string
+  clipId?: string
   sections: ScriptSection[]
   aiBackendUsed: AIProviderType
   prompt: string
