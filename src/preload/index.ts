@@ -63,6 +63,11 @@ const api = {
       status: string
       duration: number
     }> => ipcRenderer.invoke(IPC_CHANNELS.WORKER_STATUS),
+    relayDomEvent: (data: unknown): void => ipcRenderer.send('dom-event-relay', data),
+    getWebviewPreloadPath: (): Promise<string> =>
+      ipcRenderer.invoke('recording:get-webview-preload-path'),
+    saveBlob: (args: { outputDir: string; buffer: ArrayBuffer }): Promise<{ success: boolean; webmPath: string; error?: string }> =>
+      ipcRenderer.invoke('recording:save-blob', args),
   },
   clip: {
     create: (clip: Clip): Promise<Clip> =>
