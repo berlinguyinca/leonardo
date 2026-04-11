@@ -80,10 +80,10 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 44px;
-  padding: 0 12px;
-  background: var(--bg-panel-header);
-  border-bottom: 1px solid var(--border);
+  height: 32px;
+  padding: 0 10px;
+  background: #1a1a1a;
+  border-bottom: 1px solid #2a2a2a;
   -webkit-app-region: drag;
   flex-shrink: 0;
 }
@@ -93,65 +93,105 @@ body {
 .toolbar-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   -webkit-app-region: no-drag;
 }
 
-.toolbar-title {
-  font-size: 15px;
+.toolbar-left { gap: 16px; }
+
+.toolbar-menu-item {
+  font-size: 10px;
+  color: #777;
+  cursor: default;
+  user-select: none;
+  padding: 0 2px;
+}
+
+.toolbar-menu-item:hover { color: #aaa; }
+
+.toolbar-brand {
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.5px;
-  color: var(--accent);
-  margin-right: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #cccccc;
+  user-select: none;
+}
+
+.workspace-tab {
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 3px;
+  border: none;
+  background: #1e1e1e;
+  color: #666;
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.workspace-tab:hover { background: #252525; color: #999; }
+
+.workspace-tab-active {
+  background: #1d4a8a;
+  color: #8ab4f0;
+}
+
+.workspace-tab-active:hover {
+  background: #1d4a8a;
+  color: #8ab4f0;
+}
+
+.toolbar-right-divider {
+  width: 1px;
+  height: 16px;
+  background: #2a2a2a;
+  margin: 0 4px;
 }
 
 .toolbar-btn {
-  padding: 5px 12px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--bg-panel);
-  color: var(--text-primary);
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 3px;
+  border: 1px solid #2a2a2a;
+  background: #1e1e1e;
+  color: #888;
   cursor: pointer;
-  font-size: 12px;
-  transition: background 0.15s;
+  font-size: 10px;
+  transition: background 0.1s, color 0.1s;
 }
 
 .toolbar-btn:hover {
-  background: var(--bg-hover);
-}
-
-.toolbar-preset {
-  padding: 5px 16px;
-  border-radius: 4px;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  transition: all 0.15s;
-}
-
-.toolbar-preset:hover {
-  color: var(--text-primary);
-  background: var(--bg-hover);
-}
-
-.toolbar-preset.active {
-  color: var(--text-primary);
-  background: var(--bg-active);
-  color: white;
+  background: #252525;
+  color: #bbb;
 }
 
 .toolbar-theme-toggle {
-  font-size: 16px;
-  width: 32px;
-  height: 32px;
+  font-size: 12px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+}
+
+/* Legacy .toolbar-preset kept for any tests that reference it */
+.toolbar-preset {
+  padding: 4px 12px;
+  border-radius: 3px;
+  border: none;
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.toolbar-preset.active {
+  background: #1d4a8a;
+  color: #8ab4f0;
 }
 
 /* Workspace */
