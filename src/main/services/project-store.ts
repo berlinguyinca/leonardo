@@ -4,6 +4,7 @@ import { join } from 'path'
 import { DB_FILENAME } from '@shared/constants'
 import type { Project, InputModeType, Resolution } from '@shared/types'
 import type { Clip } from '@shared/types/events'
+import type { Script, ScriptSection } from '@shared/types/ai'
 
 let db: Database.Database | null = null
 
@@ -115,6 +116,13 @@ function runMigrations(db: Database.Database): void {
     `ALTER TABLE clips ADD COLUMN url TEXT NOT NULL DEFAULT ''`,
     `ALTER TABLE clips ADD COLUMN resolution_width INTEGER NOT NULL DEFAULT 1920`,
     `ALTER TABLE clips ADD COLUMN resolution_height INTEGER NOT NULL DEFAULT 1080`,
+  ]) {
+    try { db.exec(sql) } catch { /* column already exists */ }
+  }
+
+  // Idempotent column additions for scripts table (added in v3)
+  for (const sql of [
+    `ALTER TABLE scripts ADD COLUMN clip_id TEXT REFERENCES clips(id) ON DELETE SET NULL`,
   ]) {
     try { db.exec(sql) } catch { /* column already exists */ }
   }
@@ -268,4 +276,80 @@ function rowToClip(row: Record<string, unknown>): Clip {
     createdAt: row.created_at as string,
     label: row.name as string,
   }
+}
+
+// --- Script CRUD ---
+
+export function saveScript(script: Script, clipId?: string): Script {
+  const db = getDatabase()
+  db.prepare(`
+    INSERT OR REPLACE INTO scripts (id, project_id, ai_backend_used, prompt, generated_at, clip_id)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(
+    script.id,
+    script.projectId,
+    script.aiBackendUsed,
+    script.prompt,
+    script.generatedAt,
+    clipId ?? null,
+  )
+
+  const deleteStmt = db.prepare('DELETE FROM script_sections WHERE script_id = ?')
+  deleteStmt.run(script.id)
+
+  const insertSection = db.prepare(`
+    INSERT INTO script_sections (id, script_id, text, voice_profile_id, start_time, end_time, timing_markers, sort_order)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `)
+
+  for (const section of script.sections) {
+    insertSection.run(
+      section.id,
+      script.id,
+      section.text,
+      section.voiceProfileId ?? null,
+      section.startTime,
+      section.endTime,
+      JSON.stringify(section.timingMarkers),
+      section.order,
+    )
+  }
+
+  return { ...script, clipId: clipId ?? script.clipId }
+}
+
+export function listScriptsByProject(
+  projectId: string,
+): Array<Script & { sections: ScriptSection[] }> {
+  const db = getDatabase()
+  const scriptRows = db.prepare(
+    'SELECT * FROM scripts WHERE project_id = ? ORDER BY generated_at DESC',
+  ).all(projectId) as Record<string, unknown>[]
+
+  return scriptRows.map((row) => {
+    const sectionRows = db.prepare(
+      'SELECT * FROM script_sections WHERE script_id = ? ORDER BY sort_order ASC',
+    ).all(row.id as string) as Record<string, unknown>[]
+
+    const sections: ScriptSection[] = sectionRows.map((sr) => ({
+      id: sr.id as string,
+      scriptId: sr.script_id as string,
+      text: sr.text as string,
+      voiceProfileId: (sr.voice_profile_id as string) ?? null,
+      startTime: sr.start_time as number,
+      endTime: sr.end_time as number,
+      timingMarkers: JSON.parse((sr.timing_markers as string) || '[]'),
+      order: sr.sort_order as number,
+    }))
+
+    return {
+      id: row.id as string,
+      projectId: row.project_id as string,
+      clipId: (row.clip_id as string) ?? undefined,
+      aiBackendUsed: row.ai_backend_used as Script['aiBackendUsed'],
+      prompt: row.prompt as string,
+      generatedAt: row.generated_at as string,
+      sections,
+    }
+  })
 }

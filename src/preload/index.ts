@@ -3,7 +3,7 @@ import { IPC_CHANNELS } from '@shared/constants'
 import type { Project, InputModeType, Resolution } from '@shared/types/project'
 import type { ArchiveImportResult } from '../main/services/archive'
 import type { Clip, DOMEvent } from '@shared/types/events'
-import type { AIBackendConfig, Script, ScriptGenContext } from '@shared/types/ai'
+import type { AIBackendConfig, Script, ScriptGenContext, ScriptSection } from '@shared/types/ai'
 
 const api = {
   project: {
@@ -95,6 +95,12 @@ const api = {
   log: {
     read: (): Promise<string> =>
       ipcRenderer.invoke(IPC_CHANNELS.LOG_READ),
+  },
+  script: {
+    save: (script: Script, clipId?: string): Promise<Script> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCRIPT_SAVE, script, clipId),
+    listByProject: (projectId: string): Promise<Array<Script & { sections: ScriptSection[] }>> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCRIPT_LIST_BY_PROJECT, projectId),
   },
 }
 

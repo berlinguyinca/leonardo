@@ -1,9 +1,10 @@
 import { ipcMain } from 'electron'
 import { IPC_CHANNELS } from '@shared/constants'
-import type { AIBackendConfig, ScriptGenContext, Script } from '@shared/types/ai'
+import type { AIBackendConfig, ScriptGenContext, Script, ScriptSection } from '@shared/types/ai'
 import type { DOMEvent } from '@shared/types/events'
 import type { SyncPoint } from '@shared/types/timeline'
 import { createAIProvider } from '../services/ai'
+import { saveScript, listScriptsByProject } from '../services/project-store'
 
 export function registerAIIPC(): void {
   ipcMain.handle(
@@ -15,12 +16,14 @@ export function registerAIIPC(): void {
         prompt: string
         context: ScriptGenContext
         projectId: string
+        clipId?: string
       },
     ): Promise<{ success: boolean; script?: Script; error?: string }> => {
       try {
         const provider = createAIProvider(args.config)
         const script = await provider.generateScript(args.prompt, args.context)
         script.projectId = args.projectId
+        saveScript(script, args.clipId)
 
         return { success: true, script }
       } catch (err) {
@@ -69,6 +72,20 @@ export function registerAIIPC(): void {
       const { OllamaProvider } = await import('../services/ai/ollama-provider')
       const provider = new OllamaProvider('', baseUrl)
       return provider.listModels()
+    },
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.SCRIPT_SAVE,
+    async (_event, script: Script, clipId?: string): Promise<Script> => {
+      return saveScript(script, clipId)
+    },
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.SCRIPT_LIST_BY_PROJECT,
+    async (_event, projectId: string): Promise<Array<Script & { sections: ScriptSection[] }>> => {
+      return listScriptsByProject(projectId)
     },
   )
 

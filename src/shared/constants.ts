@@ -35,6 +35,8 @@ export const IPC_CHANNELS = {
   CLIP_GET_EVENTS: 'clip:get-events',
   CLIP_GET_THUMBNAILS: 'clip:get-thumbnails',
   LOG_READ: 'log:read',
+  SCRIPT_SAVE: 'script:save',
+  SCRIPT_LIST_BY_PROJECT: 'script:list-by-project',
 } as const
 
 export const TIMELINE_MIN_ZOOM = 0.1
