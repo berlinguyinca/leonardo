@@ -49,6 +49,7 @@ export async function extractThumbnails(
   count: number,
   durationMs: number,
 ): Promise<string[]> {
+  if (durationMs <= 0) return []
   const thumbDir = join(outputDir, 'thumbs')
   mkdirSync(thumbDir, { recursive: true })
   const ffmpegPath = getFFmpegPath()
