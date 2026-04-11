@@ -1,7 +1,6 @@
 import { useMemo } from 'react'
 import { useTimelineStore } from '../../stores/timeline-store'
-import { timeToPixel } from './timeline-utils'
-import { getGridInterval } from './timeline-utils'
+import { timeToPixel, pixelToTime, getGridInterval } from './timeline-utils'
 
 interface TimeRulerProps {
   scrollOffset: number
@@ -37,16 +36,24 @@ export function TimeRuler({ scrollOffset, visibleWidth, onSeek }: TimeRulerProps
     return `${seconds}.${fraction}s`
   }
 
-  const handleClick = (e: React.MouseEvent) => {
+  function handleMouseDown(e: React.MouseEvent) {
+    e.preventDefault()
     const rect = e.currentTarget.getBoundingClientRect()
-    const px = e.clientX - rect.left
-    const pxPerSec = 100 * zoomLevel
-    const timeMs = ((px + scrollOffset) / pxPerSec) * 1000
-    onSeek(Math.max(0, timeMs))
+    onSeek(Math.max(0, pixelToTime(e.clientX - rect.left, zoomLevel, scrollOffset)))
+
+    const onMove = (ev: MouseEvent) => {
+      onSeek(Math.max(0, pixelToTime(ev.clientX - rect.left, zoomLevel, scrollOffset)))
+    }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
   }
 
   return (
-    <div className="time-ruler" onClick={handleClick}>
+    <div className="time-ruler" onMouseDown={handleMouseDown}>
       {ticks.map((tick) => (
         <div
           key={tick.timeMs}

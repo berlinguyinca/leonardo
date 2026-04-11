@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IPC_CHANNELS } from '@shared/constants'
 import type { Project, InputModeType, Resolution } from '@shared/types/project'
 import type { ArchiveImportResult } from '../main/services/archive'
-import type { Clip } from '@shared/types/events'
+import type { Clip, DOMEvent } from '@shared/types/events'
 import type { AIBackendConfig, Script, ScriptGenContext } from '@shared/types/ai'
 
 const api = {
@@ -73,6 +73,10 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.CLIP_DELETE, id),
     export: (id: string): Promise<{ success: boolean; outputPath?: string; error?: string }> =>
       ipcRenderer.invoke(IPC_CHANNELS.CLIP_EXPORT, id),
+    getEvents: (id: string): Promise<DOMEvent[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLIP_GET_EVENTS, id),
+    getThumbnails: (id: string, count: number): Promise<string[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLIP_GET_THUMBNAILS, id, count),
   },
   ai: {
     generateScript: (args: {

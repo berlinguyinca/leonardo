@@ -10,6 +10,7 @@ interface TimelineState {
   selectedSyncPointId: string | null
   selectedSegmentId: string | null
   isPlaying: boolean
+  playbackRate: number
 
   setTimeline: (timeline: SyncTimeline | null) => void
   setPlayheadPosition: (position: number) => void
@@ -17,6 +18,7 @@ interface TimelineState {
   setSelectedSyncPoint: (id: string | null) => void
   setSelectedSegment: (id: string | null) => void
   setIsPlaying: (playing: boolean) => void
+  setPlaybackRate: (rate: number) => void
   addSyncPoint: (point: SyncPoint) => void
   updateSyncPoint: (id: string, updates: Partial<SyncPoint>) => void
   removeSyncPoint: (id: string) => void
@@ -34,6 +36,7 @@ export const useTimelineStore = create<TimelineState>()(
       selectedSyncPointId: null,
       selectedSegmentId: null,
       isPlaying: false,
+      playbackRate: 1,
 
       setTimeline: (timeline) => set({ timeline }),
       setPlayheadPosition: (position) => set({ playheadPosition: position }),
@@ -41,6 +44,7 @@ export const useTimelineStore = create<TimelineState>()(
       setSelectedSyncPoint: (id) => set({ selectedSyncPointId: id }),
       setSelectedSegment: (id) => set({ selectedSegmentId: id }),
       setIsPlaying: (playing) => set({ isPlaying: playing }),
+      setPlaybackRate: (rate) => set({ playbackRate: rate }),
       addSyncPoint: (point) =>
         set((state) => {
           if (!state.timeline) return state

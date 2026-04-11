@@ -34,11 +34,14 @@ export function usePlayhead() {
     const tick = (now: number) => {
       const dt = now - lastTime
       lastTime = now
-      const newPos = positionRef.current + dt
-      if (newPos >= duration) {
-        setVisualPosition(duration)
+      const rate = useTimelineStore.getState().playbackRate
+      const newPos = positionRef.current + dt * rate
+      const clamped = Math.max(0, Math.min(newPos, duration))
+      if (clamped <= 0 || clamped >= duration) {
+        setVisualPosition(clamped)
         commitPosition()
         useTimelineStore.getState().setIsPlaying(false)
+        useTimelineStore.getState().setPlaybackRate(1)
         return
       }
       setVisualPosition(newPos)

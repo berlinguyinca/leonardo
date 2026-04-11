@@ -67,6 +67,73 @@ export function useUndoRedo(): void {
         useTimelineStore.getState().setPlayheadPosition(duration)
         return
       }
+
+      // J/K/L — variable-speed transport (DaVinci Resolve style)
+      if (e.key === 'l' && !isInput) {
+        const s = useTimelineStore.getState()
+        const next = s.isPlaying && s.playbackRate > 0 ? Math.min(s.playbackRate * 2, 8) : 1
+        s.setPlaybackRate(next)
+        s.setIsPlaying(true)
+        return
+      }
+      if (e.key === 'k' && !isInput) {
+        const s = useTimelineStore.getState()
+        s.setIsPlaying(false)
+        s.setPlaybackRate(1)
+        return
+      }
+      if (e.key === 'j' && !isInput) {
+        const s = useTimelineStore.getState()
+        const next = s.isPlaying && s.playbackRate < 0 ? Math.max(s.playbackRate * 2, -8) : -1
+        s.setPlaybackRate(next)
+        s.setIsPlaying(true)
+        return
+      }
+
+      // Arrow keys — step 5s (no shift) or jump to segment boundary (shift)
+      if (e.key === 'ArrowRight' && !e.shiftKey && !isInput) {
+        e.preventDefault()
+        const s = useTimelineStore.getState()
+        s.setIsPlaying(false)
+        s.setPlayheadPosition(Math.min(s.timeline?.duration ?? 0, s.playheadPosition + 5000))
+        return
+      }
+      if (e.key === 'ArrowLeft' && !e.shiftKey && !isInput) {
+        e.preventDefault()
+        const s = useTimelineStore.getState()
+        s.setIsPlaying(false)
+        s.setPlayheadPosition(Math.max(0, s.playheadPosition - 5000))
+        return
+      }
+      if (e.key === 'ArrowRight' && e.shiftKey && !isInput) {
+        e.preventDefault()
+        jumpSegmentBoundary('next')
+        return
+      }
+      if (e.key === 'ArrowLeft' && e.shiftKey && !isInput) {
+        e.preventDefault()
+        jumpSegmentBoundary('prev')
+        return
+      }
+    }
+
+    function jumpSegmentBoundary(dir: 'prev' | 'next') {
+      const s = useTimelineStore.getState()
+      const pos = s.playheadPosition
+      const boundaries = Array.from(
+        new Set(
+          (s.timeline?.tracks ?? []).flatMap((t) =>
+            t.segments.flatMap((seg) => [seg.startTime, seg.endTime]),
+          ),
+        ),
+      ).sort((a, b) => a - b)
+
+      const target =
+        dir === 'next'
+          ? boundaries.find((b) => b > pos)
+          : [...boundaries].reverse().find((b) => b < pos)
+
+      if (target !== undefined) s.setPlayheadPosition(target)
     }
 
     window.addEventListener('keydown', handleKeyDown)

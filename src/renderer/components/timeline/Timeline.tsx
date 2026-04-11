@@ -9,6 +9,7 @@ import { Playhead } from './Playhead'
 import { TrackLane } from './TrackLane'
 import { ScrollContainer } from './ScrollContainer'
 import { ZoomControls } from './ZoomControls'
+import { TransportControls } from './TransportControls'
 
 function EmptyTimelineDropZone(): React.ReactNode {
   const clips = useLibraryStore((s) => s.clips)
@@ -76,7 +77,7 @@ export function Timeline(): React.ReactNode {
   return (
     <div className="timeline-container" onClick={handleDeselect}>
       <div className="timeline-header">
-        <span className="timeline-title">Timeline</span>
+        <TransportControls />
         <ZoomControls
           onZoomIn={() => zoom('in')}
           onZoomOut={() => zoom('out')}

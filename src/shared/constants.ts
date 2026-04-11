@@ -32,6 +32,8 @@ export const IPC_CHANNELS = {
   CLIP_LIST: 'clip:list',
   CLIP_DELETE: 'clip:delete',
   CLIP_EXPORT: 'clip:export',
+  CLIP_GET_EVENTS: 'clip:get-events',
+  CLIP_GET_THUMBNAILS: 'clip:get-thumbnails',
   LOG_READ: 'log:read',
 } as const
 
