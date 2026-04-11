@@ -9,7 +9,8 @@ export function usePlayhead() {
 
   const isPlaying = useTimelineStore((s) => s.isPlaying)
   const setPlayheadPosition = useTimelineStore((s) => s.setPlayheadPosition)
-  const duration = useTimelineStore((s) => s.timeline?.duration ?? 0)
+  // NOTE: duration is NOT subscribed here — it's read imperatively inside the RAF
+  // tick to avoid the closure-over-zero bug when the timeline loads after mount.
 
   const setVisualPosition = useCallback((timeMs: number) => {
     positionRef.current = timeMs
@@ -21,10 +22,11 @@ export function usePlayhead() {
   }, [setPlayheadPosition])
 
   const seekTo = useCallback((timeMs: number) => {
-    const clamped = Math.max(0, Math.min(timeMs, duration))
+    const currentDuration = useTimelineStore.getState().timeline?.duration ?? 0
+    const clamped = Math.max(0, Math.min(timeMs, currentDuration))
     setVisualPosition(clamped)
     setPlayheadPosition(clamped)
-  }, [duration, setVisualPosition, setPlayheadPosition])
+  }, [setVisualPosition, setPlayheadPosition])
 
   useEffect(() => {
     if (!isPlaying) return
@@ -34,10 +36,16 @@ export function usePlayhead() {
     const tick = (now: number) => {
       const dt = now - lastTime
       lastTime = now
-      const rate = useTimelineStore.getState().playbackRate
-      const newPos = positionRef.current + dt * rate
-      const clamped = Math.max(0, Math.min(newPos, duration))
-      if (clamped <= 0 || clamped >= duration) {
+      const { playbackRate, timeline } = useTimelineStore.getState()
+      const currentDuration = timeline?.duration ?? 0
+      // If timeline not yet loaded, keep ticking without advancing
+      if (currentDuration <= 0) {
+        rafRef.current = requestAnimationFrame(tick)
+        return
+      }
+      const newPos = positionRef.current + dt * playbackRate
+      const clamped = Math.max(0, Math.min(newPos, currentDuration))
+      if (clamped <= 0 || clamped >= currentDuration) {
         setVisualPosition(clamped)
         commitPosition()
         useTimelineStore.getState().setIsPlaying(false)
@@ -50,7 +58,8 @@ export function usePlayhead() {
 
     rafRef.current = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [isPlaying, duration, setVisualPosition, commitPosition])
+  }, [isPlaying, setVisualPosition, commitPosition])
+  // NOTE: `duration` intentionally NOT in deps — read imperatively inside tick
 
   return {
     playheadRef,
