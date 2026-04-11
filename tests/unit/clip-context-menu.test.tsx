@@ -9,6 +9,7 @@ const mockAddClipToTimeline = vi.fn()
 const mockRemoveClip = vi.fn()
 const mockSetSections = vi.fn()
 const mockSetEditorView = vi.fn()
+const mockSetTimelineCollapsed = vi.fn()
 const mockActiveProjectId = 'proj-1'
 
 vi.mock('../../src/renderer/stores/timeline-store', () => ({
@@ -24,8 +25,8 @@ vi.mock('../../src/renderer/stores/script-store', () => ({
     selector({ setSections: mockSetSections }),
 }))
 vi.mock('../../src/renderer/stores/ui-store', () => ({
-  useUIStore: (selector: (s: { setEditorView: typeof mockSetEditorView }) => unknown) =>
-    selector({ setEditorView: mockSetEditorView }),
+  useUIStore: (selector: (s: { setEditorView: typeof mockSetEditorView; setTimelineCollapsed: typeof mockSetTimelineCollapsed }) => unknown) =>
+    selector({ setEditorView: mockSetEditorView, setTimelineCollapsed: mockSetTimelineCollapsed }),
 }))
 vi.mock('../../src/renderer/stores/project-store', () => ({
   useProjectStore: (selector: (s: { activeProjectId: string }) => unknown) =>
@@ -52,6 +53,7 @@ describe('ClipContextMenu', () => {
     mockRemoveClip.mockClear()
     mockSetSections.mockClear()
     mockSetEditorView.mockClear()
+    mockSetTimelineCollapsed.mockClear()
   })
 
   it('renders all 4 menu items', () => {
@@ -70,13 +72,15 @@ describe('ClipContextMenu', () => {
     expect(menu).toHaveStyle({ left: '100px', top: '200px' })
   })
 
-  it('"Add to Timeline" click calls addClipToTimeline and onClose', () => {
+  it('"Add to Timeline" click calls addClipToTimeline, switches view to inline, and closes', () => {
     render(<ClipContextMenu clip={mockClip} position={{ x: 100, y: 200 }} onClose={onClose} />)
 
     fireEvent.click(screen.getByText('Add to Timeline'))
 
     expect(mockAddClipToTimeline).toHaveBeenCalledOnce()
     expect(mockAddClipToTimeline).toHaveBeenCalledWith(mockClip)
+    expect(mockSetEditorView).toHaveBeenCalledWith('inline')
+    expect(mockSetTimelineCollapsed).toHaveBeenCalledWith(false)
     expect(onClose).toHaveBeenCalledOnce()
   })
 

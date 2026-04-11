@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Clip } from '@shared/types/events'
 import { useLibraryStore } from '../../stores/library-store'
 import { useTimelineStore } from '../../stores/timeline-store'
+import { useUIStore } from '../../stores/ui-store'
 import { ClipContextMenu } from './ClipContextMenu'
 
 function formatDuration(ms: number): string {
@@ -22,6 +23,8 @@ export function ClipLibrary(): React.ReactNode {
   const setHighlightedClip = useLibraryStore((s) => s.setHighlightedClip)
   const loadClips = useLibraryStore((s) => s.loadClips)
   const addClipToTimeline = useTimelineStore((s) => s.addClipToTimeline)
+  const setEditorView = useUIStore((s) => s.setEditorView)
+  const setTimelineCollapsed = useUIStore((s) => s.setTimelineCollapsed)
   const [contextMenu, setContextMenu] = useState<{ clip: Clip; x: number; y: number } | null>(null)
 
   useEffect(() => {
@@ -49,7 +52,11 @@ export function ClipLibrary(): React.ReactNode {
           key={clip.id}
           className={`clip-card ${highlightedClipId === clip.id ? 'clip-highlighted' : ''}`}
           draggable
-          onDoubleClick={() => addClipToTimeline(clip)}
+          onDoubleClick={() => {
+              addClipToTimeline(clip)
+              setEditorView('inline')
+              setTimelineCollapsed(false)
+            }}
           onContextMenu={(e) => {
             e.preventDefault()
             setContextMenu({ clip, x: e.clientX, y: e.clientY })

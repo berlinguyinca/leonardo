@@ -3,6 +3,7 @@ import { useRecordingStore } from '../../stores/recording-store'
 import { useUIStore } from '../../stores/ui-store'
 import { useLibraryStore } from '../../stores/library-store'
 import { useTimelineStore } from '../../stores/timeline-store'
+import { useProjectStore } from '../../stores/project-store'
 import type { Clip } from '@shared/types/events'
 
 interface RecordingControlsProps {
@@ -25,6 +26,9 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
 
   const collapseAllPanels = useUIStore((s) => s.collapseAllPanels)
   const restorePanelState = useUIStore((s) => s.restorePanelState)
+  const setEditorView = useUIStore((s) => s.setEditorView)
+  const setTimelineCollapsed = useUIStore((s) => s.setTimelineCollapsed)
+  const activeProjectId = useProjectStore((s) => s.activeProjectId)
   const currentUrl = useRecordingStore((s) => s.currentUrl)
   const targetResolution = useRecordingStore((s) => s.targetResolution)
   const addClip = useLibraryStore((s) => s.addClip)
@@ -98,7 +102,7 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
         const currentClipCount = useLibraryStore.getState().clips.length
         const clip: Clip = {
           id: result.recordingId,
-          projectId: '',
+          projectId: activeProjectId ?? '',
           filePath: result.outputDir ? `${result.outputDir}/recording.webm` : '',
           duration: result.duration ?? recordingDuration,
           url: currentUrl,
@@ -165,6 +169,8 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
           <button
             onClick={() => {
               addClipToTimeline(pendingClip)
+              setEditorView('inline')
+              setTimelineCollapsed(false)
               setPendingClip(null)
             }}
           >

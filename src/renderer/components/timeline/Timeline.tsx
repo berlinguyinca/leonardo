@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { useTimelineStore } from '../../stores/timeline-store'
+import { useLibraryStore } from '../../stores/library-store'
 import { usePlayhead } from '../../hooks/usePlayhead'
 import { useTimelineZoom } from '../../hooks/useTimelineZoom'
 import { timeToPixel } from './timeline-utils'
@@ -8,6 +9,43 @@ import { Playhead } from './Playhead'
 import { TrackLane } from './TrackLane'
 import { ScrollContainer } from './ScrollContainer'
 import { ZoomControls } from './ZoomControls'
+
+function EmptyTimelineDropZone(): React.ReactNode {
+  const clips = useLibraryStore((s) => s.clips)
+  const addClipToTimeline = useTimelineStore((s) => s.addClipToTimeline)
+  const [isDragOver, setIsDragOver] = useState(false)
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+    setIsDragOver(true)
+  }
+
+  function handleDragLeave() {
+    setIsDragOver(false)
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setIsDragOver(false)
+    const clipId = e.dataTransfer.getData('application/clip-id')
+    const clip = clips.find((c) => c.id === clipId)
+    if (clip) addClipToTimeline(clip)
+  }
+
+  return (
+    <div
+      className={`timeline-container timeline-empty-dropzone${isDragOver ? ' drag-over' : ''}`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      <div className="panel-placeholder">
+        Drop clips here or double-click a clip to start
+      </div>
+    </div>
+  )
+}
 
 export function Timeline(): React.ReactNode {
   const timeline = useTimelineStore((s) => s.timeline)
@@ -32,11 +70,7 @@ export function Timeline(): React.ReactNode {
   }, [])
 
   if (!timeline) {
-    return (
-      <div className="timeline-container">
-        <div className="panel-placeholder">No timeline loaded</div>
-      </div>
-    )
+    return <EmptyTimelineDropZone />
   }
 
   return (

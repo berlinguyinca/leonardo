@@ -23,6 +23,7 @@ export function ClipContextMenu({ clip, position, onClose }: ClipContextMenuProp
   const removeClip = useLibraryStore((s) => s.removeClip)
   const setSections = useScriptStore((s) => s.setSections)
   const setEditorView = useUIStore((s) => s.setEditorView)
+  const setTimelineCollapsed = useUIStore((s) => s.setTimelineCollapsed)
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
 
   useEffect(() => {
@@ -89,6 +90,8 @@ export function ClipContextMenu({ clip, position, onClose }: ClipContextMenuProp
       <li
         onClick={() => {
           addClipToTimeline(clip)
+          setEditorView('inline')
+          setTimelineCollapsed(false)
           onClose()
         }}
       >
