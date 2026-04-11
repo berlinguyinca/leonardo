@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTimelineStore } from '../../stores/timeline-store'
 import { useLibraryStore } from '../../stores/library-store'
 import { usePlayhead } from '../../hooks/usePlayhead'
@@ -68,6 +68,20 @@ export function Timeline(): React.ReactNode {
   const handleDeselect = useCallback(() => {
     useTimelineStore.getState().setSelectedSyncPoint(null)
     useTimelineStore.getState().setSelectedSegment(null)
+  }, [])
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return
+      const { selectedSegmentId, removeSegment, setSelectedSegment } = useTimelineStore.getState()
+      if (!selectedSegmentId) return
+      e.preventDefault()
+      removeSegment(selectedSegmentId)
+      setSelectedSegment(null)
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
   }, [])
 
   if (!timeline) {
