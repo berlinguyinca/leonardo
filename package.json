@@ -10,9 +10,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
-    "postinstall": "electron-builder install-app-deps",
+    "postinstall": "electron-rebuild -f -w better-sqlite3",
     "pretest": "npm rebuild better-sqlite3",
-    "posttest": "npm run postinstall"
+    "posttest": "electron-rebuild -f -w better-sqlite3"
   },
   "keywords": [
     "electron",
