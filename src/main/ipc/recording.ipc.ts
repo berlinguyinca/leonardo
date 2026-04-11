@@ -1,11 +1,13 @@
 import { ipcMain, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { app } from 'electron'
+import * as fs from 'fs'
 import { v4 as uuidv4 } from 'uuid'
 import { IPC_CHANNELS } from '@shared/constants'
 import { startCapture, stopCapture, handleDOMEvent, isLeonardoEvent } from '../services/dom-capture'
 import { processRecording } from '../workers/recording-worker'
 import { getFFmpegPath } from '../utils/ffmpeg'
+import type { DOMEvent } from '@shared/types/events'
 
 interface RecordingSession {
   id: string
@@ -17,6 +19,9 @@ interface RecordingSession {
 }
 
 let currentSession: RecordingSession | null = null
+
+// Store DOM events by recording ID so recording:convert can retrieve them
+const pendingEvents: Map<string, DOMEvent[]> = new Map()
 
 export function registerRecordingIPC(): void {
   ipcMain.handle(
@@ -43,19 +48,6 @@ export function registerRecordingIPC(): void {
       // Start DOM event capture
       startCapture(args.webviewId)
 
-      // Set up message forwarding from webview for DOM events
-      const mainWindow = BrowserWindow.getAllWindows()[0]
-      if (mainWindow) {
-        mainWindow.webContents.on('ipc-message', (_event, channel, ...args) => {
-          if (channel === 'dom-event' && currentSession) {
-            const data = args[0]
-            if (isLeonardoEvent(data)) {
-              handleDOMEvent(currentSession.webContentsId, data)
-            }
-          }
-        })
-      }
-
       return {
         success: true,
         recordingId,
@@ -75,6 +67,9 @@ export function registerRecordingIPC(): void {
     // Stop DOM capture and collect events
     const domEvents = stopCapture(session.webContentsId)
 
+    // Store events keyed by recording ID for recording:convert to pick up
+    pendingEvents.set(session.id, domEvents)
+
     // The renderer will have saved the WebM blob via MediaRecorder.
     // The IPC stop returns session info; the renderer sends the blob path separately.
     return {
@@ -93,7 +88,9 @@ export function registerRecordingIPC(): void {
       _event,
       args: { recordingId: string; webmPath: string; outputDir: string; projectId: string },
     ) => {
-      const domEvents = stopCapture(-1) // Already stopped, but safe
+      // Retrieve events stored at stop time and clear them
+      const domEvents = pendingEvents.get(args.recordingId) ?? []
+      pendingEvents.delete(args.recordingId)
 
       const mainWindow = BrowserWindow.getAllWindows()[0]
       const result = await processRecording(
@@ -134,6 +131,28 @@ export function registerRecordingIPC(): void {
       recordingId: currentSession?.id ?? null,
       status: currentSession?.status ?? 'idle',
       duration: currentSession ? Date.now() - currentSession.startTime : 0,
+    }
+  })
+
+  // Save WebM blob received from renderer to disk
+  ipcMain.handle(
+    'recording:save-blob',
+    async (_event, args: { outputDir: string; buffer: ArrayBuffer }) => {
+      const webmPath = join(args.outputDir, 'recording.webm')
+      await fs.promises.writeFile(webmPath, Buffer.from(args.buffer))
+      return { success: true, webmPath }
+    },
+  )
+
+  // Expose webview preload path to the renderer
+  ipcMain.handle('recording:get-webview-preload-path', () =>
+    join(__dirname, '../preload/webview-preload.js'),
+  )
+
+  // DOM events are relayed from renderer (which listens on the <webview> ipc-message event)
+  ipcMain.on('dom-event-relay', (_event, data) => {
+    if (currentSession && isLeonardoEvent(data)) {
+      handleDOMEvent(currentSession.webContentsId, data)
     }
   })
 }

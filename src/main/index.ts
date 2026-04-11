@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, shell, desktopCapturer } from 'electron'
 import { join } from 'path'
 import { registerProjectIPC } from './ipc/project.ipc'
 import { registerRecordingIPC } from './ipc/recording.ipc'
@@ -30,6 +30,13 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show()
+  })
+
+  // Auto-approve screen capture requests for recording
+  mainWindow.webContents.session.setDisplayMediaRequestHandler((_request, callback) => {
+    desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
+      callback({ video: sources[0] })
+    })
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
