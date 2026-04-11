@@ -50,7 +50,7 @@ export function TrackLane({
   }
 
   return (
-    <div className="track-lane" data-track-id={track.id}>
+    <div className={`track-lane${track.type === 'audio' ? ' track-audio' : ''}`} data-track-id={track.id}>
       <TrackHeader track={track} onToggleMute={onToggleMute} onToggleLock={onToggleLock} />
       <div
         className="track-content"

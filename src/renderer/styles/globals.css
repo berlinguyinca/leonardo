@@ -782,33 +782,42 @@ body {
   position: absolute;
   top: 4px;
   height: calc(100% - 8px);
-  background: var(--bg-hover);
-  border: 1px solid var(--border);
+  background: var(--segment-video);
+  border: none;
   border-radius: 3px;
   cursor: grab;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   overflow: hidden;
-  transition: border-color 0.1s;
+  box-shadow: var(--inset-highlight);
+  transition: box-shadow 0.1s;
 }
 
-.timeline-segment:hover {
-  border-color: var(--text-muted);
+.timeline-segment:hover:not(.selected) {
+  box-shadow: 0 0 0 1px rgba(74, 158, 255, 0.4), var(--inset-highlight);
 }
 
 .timeline-segment.selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
+  box-shadow: 0 0 0 2px #4a9eff, var(--inset-highlight);
 }
 
 .segment-label {
-  padding: 0 6px;
-  font-size: 10px;
-  color: var(--text-secondary);
+  position: absolute;
+  bottom: 2px;
+  left: 4px;
+  right: 4px;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.85);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   user-select: none;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  z-index: 1;
+}
+
+.track-audio .timeline-segment {
+  background: var(--segment-audio);
 }
 
 .segment-edge {
@@ -817,6 +826,7 @@ body {
   bottom: 0;
   width: 6px;
   cursor: col-resize;
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .segment-edge-left { left: 0; }
@@ -962,11 +972,11 @@ body {
 }
 
 .time-ruler {
-  height: 24px;
+  height: 18px;
   position: relative;
-  background: var(--bg-panel-header);
-  border-bottom: 1px solid var(--border);
-  cursor: pointer;
+  background: #161616;
+  border-bottom: 1px solid #1e1e1e;
+  cursor: col-resize;
   flex-shrink: 0;
 }
 
@@ -974,25 +984,25 @@ body {
   position: absolute;
   top: 0;
   width: 1px;
-  background: var(--border);
+  background: #2a2a2a;
 }
 
 .time-ruler-tick.major {
-  height: 16px;
-  background: var(--text-muted);
+  height: 14px;
+  background: #383838;
 }
 
 .time-ruler-tick.minor {
-  height: 8px;
-  top: 8px;
+  height: 7px;
+  top: 6px;
 }
 
 .time-ruler-label {
   position: absolute;
-  top: 0;
+  top: 1px;
   left: 4px;
-  font-size: 10px;
-  color: var(--text-muted);
+  font-size: 9px;
+  color: #555555;
   white-space: nowrap;
   user-select: none;
 }
@@ -1009,7 +1019,7 @@ body {
 .playhead-head {
   width: 12px;
   height: 12px;
-  background: var(--danger);
+  background: #ff453a;
   border-radius: 2px 2px 50% 50%;
   position: absolute;
   top: 0;
@@ -1022,7 +1032,7 @@ body {
   bottom: 0;
   left: 0;
   width: 1px;
-  background: var(--danger);
+  background: #ff453a;
 }
 
 .zoom-controls {
