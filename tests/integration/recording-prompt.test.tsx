@@ -9,7 +9,9 @@ import React from 'react'
 
 // Minimal webview ref mock
 function makeWebviewRef(): React.RefObject<Electron.WebviewTag | null> {
-  return { current: null } as React.RefObject<Electron.WebviewTag | null>
+  return {
+    current: { getWebContentsId: () => 42 } as unknown as Electron.WebviewTag,
+  } as React.RefObject<Electron.WebviewTag | null>
 }
 
 // ---- MediaRecorder mock ----

@@ -89,15 +89,21 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
   }, [pendingClip])
 
   const handleStart = useCallback(async () => {
+    if (status !== 'idle') return
     setStatus('recording')
     setRecordingDuration(0)
     setPausedDuration(0)
     startTimer()
     collapseAllPanels()
 
-    await window.leonardo.recording.start({
-      webviewId: webviewRef.current?.getWebContentsId() ?? -1,
-    })
+    const webContentsId = webviewRef.current?.getWebContentsId()
+    if (webContentsId == null) {
+      setStatus('idle')
+      restorePanelState()
+      stopTimer()
+      return
+    }
+    await window.leonardo.recording.start({ webviewId: webContentsId })
 
     // Start screen capture via MediaRecorder
     try {
@@ -115,7 +121,7 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
       // If screen capture fails (e.g. user denied), continue recording without video
       console.warn('[RecordingControls] Screen capture failed:', err)
     }
-  }, [setStatus, setRecordingDuration, startTimer, collapseAllPanels, webviewRef])
+  }, [status, setStatus, setRecordingDuration, startTimer, stopTimer, collapseAllPanels, restorePanelState, webviewRef])
 
   const handlePause = useCallback(() => {
     setStatus('paused')

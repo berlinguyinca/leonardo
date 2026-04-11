@@ -163,7 +163,7 @@ export function registerRecordingIPC(): void {
 
   // Expose webview preload path to the renderer
   ipcMain.handle('recording:get-webview-preload-path', () =>
-    join(__dirname, '../preload/webview-preload.js'),
+    'file://' + join(__dirname, '../preload/webview-preload.js'),
   )
 
   // DOM events are relayed from renderer (which listens on the <webview> ipc-message event)

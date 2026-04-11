@@ -39,6 +39,12 @@ function makeWebviewRef(): React.RefObject<Electron.WebviewTag | null> {
   return { current: null } as React.RefObject<Electron.WebviewTag | null>
 }
 
+function makeWebviewRefWithId(id = 42): React.RefObject<Electron.WebviewTag | null> {
+  return {
+    current: { getWebContentsId: () => id } as unknown as Electron.WebviewTag,
+  } as React.RefObject<Electron.WebviewTag | null>
+}
+
 function makeMockStream(): MediaStream {
   const track = { stop: vi.fn(), kind: 'video' } as unknown as MediaStreamTrack
   return {
@@ -114,7 +120,7 @@ describe('RecordingControls — screen capture (unit)', () => {
   })
 
   it('calls getDisplayMedia when Record is clicked', async () => {
-    const webviewRef = makeWebviewRef()
+    const webviewRef = makeWebviewRefWithId()
     useRecordingStore.setState({ status: 'idle' })
     render(<RecordingControls webviewRef={webviewRef} />)
 
@@ -127,7 +133,7 @@ describe('RecordingControls — screen capture (unit)', () => {
   })
 
   it('calls recording.start() when Record is clicked', async () => {
-    const webviewRef = makeWebviewRef()
+    const webviewRef = makeWebviewRefWithId()
     useRecordingStore.setState({ status: 'idle' })
     render(<RecordingControls webviewRef={webviewRef} />)
 
@@ -151,7 +157,7 @@ describe('RecordingControls — screen capture (unit)', () => {
   }
 
   it('calls saveBlob and convert when Stop is clicked after recording', async () => {
-    const webviewRef = makeWebviewRef()
+    const webviewRef = makeWebviewRefWithId()
     useRecordingStore.setState({ status: 'idle' })
     render(<RecordingControls webviewRef={webviewRef} />)
 
@@ -176,7 +182,7 @@ describe('RecordingControls — screen capture (unit)', () => {
   })
 
   it('creates a clip with videoPath from convert result', async () => {
-    const webviewRef = makeWebviewRef()
+    const webviewRef = makeWebviewRefWithId()
     useRecordingStore.setState({ status: 'idle' })
     render(<RecordingControls webviewRef={webviewRef} />)
 
@@ -194,7 +200,7 @@ describe('RecordingControls — screen capture (unit)', () => {
   })
 
   it('shows "Clip added to library." after successful stop', async () => {
-    const webviewRef = makeWebviewRef()
+    const webviewRef = makeWebviewRefWithId()
     useRecordingStore.setState({ status: 'idle' })
     render(<RecordingControls webviewRef={webviewRef} />)
 
@@ -215,7 +221,7 @@ describe('RecordingControls — screen capture (unit)', () => {
       webmPath: '',
     })
 
-    const webviewRef = makeWebviewRef()
+    const webviewRef = makeWebviewRefWithId()
     useRecordingStore.setState({ status: 'idle' })
     render(<RecordingControls webviewRef={webviewRef} />)
 
@@ -236,7 +242,7 @@ describe('RecordingControls — screen capture (unit)', () => {
       error: 'ffmpeg failed',
     })
 
-    const webviewRef = makeWebviewRef()
+    const webviewRef = makeWebviewRefWithId()
     useRecordingStore.setState({ status: 'idle' })
     render(<RecordingControls webviewRef={webviewRef} />)
 
@@ -255,7 +261,7 @@ describe('RecordingControls — screen capture (unit)', () => {
       new Error('Permission denied'),
     )
 
-    const webviewRef = makeWebviewRef()
+    const webviewRef = makeWebviewRefWithId()
     useRecordingStore.setState({ status: 'idle' })
     render(<RecordingControls webviewRef={webviewRef} />)
 
