@@ -124,6 +124,15 @@ describe('SegmentContextMenu', () => {
     expect(onClose).toHaveBeenCalledOnce()
   })
 
+  it('"Remove from Timeline" calls setSelectedSegment only with null (stopPropagation prevents segment-id call)', () => {
+    render(<SegmentContextMenu segment={mockSegment} position={{ x: 100, y: 200 }} onClose={onClose} />)
+
+    fireEvent.click(screen.getByText('Remove from Timeline'))
+
+    expect(mockSetSelectedSegment).toHaveBeenCalledOnce()
+    expect(mockSetSelectedSegment).toHaveBeenCalledWith(null)
+  })
+
   it('"Generate Script" click shows a textarea prompt', () => {
     render(<SegmentContextMenu segment={mockSegment} position={{ x: 100, y: 200 }} onClose={onClose} />)
 

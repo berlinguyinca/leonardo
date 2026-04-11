@@ -87,10 +87,20 @@ describe('project-store: script CRUD', () => {
     })
 
     it('returns script with clipId from existing field when no clipId arg given', () => {
-      const script = makeScript({ clipId: 'existing-clip' })
+      const script = makeScript({ clipId: 'clip-test' })
       const result = saveScript(script)
 
-      expect(result.clipId).toBe('existing-clip')
+      expect(result.clipId).toBe('clip-test')
+    })
+
+    it('round-trips clipId through DB when set on script and no clipId arg given', () => {
+      const script = makeScript({ clipId: 'clip-test' })
+      saveScript(script)
+
+      const results = listScriptsByProject('proj-1')
+
+      expect(results).toHaveLength(1)
+      expect(results[0].clipId).toBe('clip-test')
     })
 
     it('replaces sections on re-save (upsert behavior)', () => {

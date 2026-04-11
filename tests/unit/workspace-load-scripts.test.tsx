@@ -111,4 +111,18 @@ describe('Workspace — load project scripts on activeProjectId change', () => {
     expect(mockListByProject).not.toHaveBeenCalled()
     expect(mockLoadProjectScripts).not.toHaveBeenCalled()
   })
+
+  it('does not throw when listByProject rejects', async () => {
+    mockListByProject.mockRejectedValue(new Error('network error'))
+
+    const { Workspace } = await import('../../src/renderer/components/layout/Workspace')
+
+    await act(async () => {
+      useProjectStore.setState({ activeProjectId: 'proj-1' })
+      render(<Workspace />)
+    })
+
+    // Component renders without throwing and loadProjectScripts is never called
+    expect(mockLoadProjectScripts).not.toHaveBeenCalled()
+  })
 })

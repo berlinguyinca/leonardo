@@ -12,13 +12,17 @@ export function Workspace(): React.ReactNode {
 
   useEffect(() => {
     if (!activeProjectId || !window.leonardo?.script) return
-    window.leonardo.script.listByProject(activeProjectId).then((scripts) => {
-      loadProjectScripts(
-        scripts
-          .filter((s) => s.clipId != null)
-          .map((s) => ({ clipId: s.clipId!, sections: s.sections })),
-      )
-    })
+    window.leonardo.script.listByProject(activeProjectId)
+      .then((scripts) => {
+        loadProjectScripts(
+          scripts
+            .filter((s) => s.clipId != null)
+            .map((s) => ({ clipId: s.clipId!, sections: s.sections })),
+        )
+      })
+      .catch(() => {
+        // Script pre-loading failed; scripts will be generated fresh as needed
+      })
   }, [activeProjectId, loadProjectScripts])
 
   return (

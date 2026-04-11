@@ -95,7 +95,8 @@ export function SegmentContextMenu({ segment, position, onClose }: SegmentContex
       style={{ position: 'fixed', left: position.x, top: position.y, zIndex: 1000 }}
     >
       <li
-        onClick={() => {
+        onClick={(e) => {
+          e.stopPropagation()
           removeSegment(segment.id)
           setSelectedSegment(null)
           onClose()

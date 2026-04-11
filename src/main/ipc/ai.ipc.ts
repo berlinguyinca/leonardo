@@ -23,9 +23,8 @@ export function registerAIIPC(): void {
         const provider = createAIProvider(args.config)
         const script = await provider.generateScript(args.prompt, args.context)
         script.projectId = args.projectId
-        saveScript(script, args.clipId)
-
-        return { success: true, script }
+        const saved = saveScript(script, args.clipId)
+        return { success: true, script: saved }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err)
         return { success: false, error: errorMessage }

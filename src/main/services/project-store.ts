@@ -284,7 +284,7 @@ export function saveScript(script: Script, clipId?: string): Script {
   const db = getDatabase()
   db.transaction(() => {
     db.prepare(`INSERT OR REPLACE INTO scripts (id, project_id, ai_backend_used, prompt, generated_at, clip_id) VALUES (?, ?, ?, ?, ?, ?)`)
-      .run(script.id, script.projectId, script.aiBackendUsed, script.prompt, script.generatedAt, clipId ?? null)
+      .run(script.id, script.projectId, script.aiBackendUsed, script.prompt, script.generatedAt, clipId ?? script.clipId ?? null)
     db.prepare('DELETE FROM script_sections WHERE script_id = ?').run(script.id)
     const insertSection = db.prepare(`INSERT INTO script_sections (id, script_id, text, voice_profile_id, start_time, end_time, timing_markers, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
     for (const section of script.sections) {
