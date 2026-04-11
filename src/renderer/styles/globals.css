@@ -247,15 +247,19 @@ body {
 }
 
 .panel-header {
-  padding: 6px 10px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-  background: var(--bg-panel-header);
-  border-bottom: 1px solid var(--border);
+  height: 24px;
+  background: #141414;
+  border-bottom: 1px solid #202020;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 600;
+  color: #555555;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
 }
 
 .panel-content {
@@ -289,14 +293,18 @@ body {
   align-items: center;
   gap: 6px;
   user-select: none;
+  font-size: 9px;
+  font-weight: 600;
+  color: #555555;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
 }
 
-.panel-header-toggle:hover {
-  color: var(--text);
-}
+.panel-header-toggle:hover { color: #888888; }
 
 .collapse-chevron {
-  font-size: 8px;
+  font-size: 10px;
+  color: #444444;
   line-height: 1;
   flex-shrink: 0;
 }
@@ -717,29 +725,31 @@ body {
 /* Track Lanes */
 .track-lane {
   display: flex;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid #1c1c1c;
   min-height: 48px;
 }
 
 .track-header {
-  width: 120px;
+  width: 32px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 4px 8px;
-  background: var(--bg-panel-header);
-  border-right: 1px solid var(--border);
+  justify-content: center;
+  padding: 4px;
+  background: #1a1a1a;
+  border-right: 1px solid #222222;
 }
 
 .track-label {
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: #555555;
   text-transform: capitalize;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
 }
 
 .track-header-controls {
@@ -776,6 +786,7 @@ body {
   flex: 1;
   position: relative;
   overflow: hidden;
+  background: #131313;
 }
 
 .timeline-segment {
@@ -940,23 +951,27 @@ body {
   height: 100%;
   position: relative;
   overflow: hidden;
+  background: #111111;
 }
 
 .timeline-header {
+  height: 30px;
+  background: #1a1a1a;
+  border-bottom: 1px solid #222222;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 8px;
-  background: var(--bg-panel-header);
-  border-bottom: 1px solid var(--border);
+  padding: 0 4px 0 0;
   flex-shrink: 0;
 }
 
 .timeline-title {
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 600;
   text-transform: uppercase;
-  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  color: #555555;
+  padding-left: 8px;
 }
 
 .timeline-scroll-container {
@@ -964,6 +979,7 @@ body {
   overflow-x: auto;
   overflow-y: auto;
   position: relative;
+  background: #111111;
 }
 
 .timeline-scroll-content {
