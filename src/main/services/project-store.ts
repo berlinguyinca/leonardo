@@ -282,39 +282,15 @@ function rowToClip(row: Record<string, unknown>): Clip {
 
 export function saveScript(script: Script, clipId?: string): Script {
   const db = getDatabase()
-  db.prepare(`
-    INSERT OR REPLACE INTO scripts (id, project_id, ai_backend_used, prompt, generated_at, clip_id)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(
-    script.id,
-    script.projectId,
-    script.aiBackendUsed,
-    script.prompt,
-    script.generatedAt,
-    clipId ?? null,
-  )
-
-  const deleteStmt = db.prepare('DELETE FROM script_sections WHERE script_id = ?')
-  deleteStmt.run(script.id)
-
-  const insertSection = db.prepare(`
-    INSERT INTO script_sections (id, script_id, text, voice_profile_id, start_time, end_time, timing_markers, sort_order)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `)
-
-  for (const section of script.sections) {
-    insertSection.run(
-      section.id,
-      script.id,
-      section.text,
-      section.voiceProfileId ?? null,
-      section.startTime,
-      section.endTime,
-      JSON.stringify(section.timingMarkers),
-      section.order,
-    )
-  }
-
+  db.transaction(() => {
+    db.prepare(`INSERT OR REPLACE INTO scripts (id, project_id, ai_backend_used, prompt, generated_at, clip_id) VALUES (?, ?, ?, ?, ?, ?)`)
+      .run(script.id, script.projectId, script.aiBackendUsed, script.prompt, script.generatedAt, clipId ?? null)
+    db.prepare('DELETE FROM script_sections WHERE script_id = ?').run(script.id)
+    const insertSection = db.prepare(`INSERT INTO script_sections (id, script_id, text, voice_profile_id, start_time, end_time, timing_markers, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    for (const section of script.sections) {
+      insertSection.run(section.id, script.id, section.text, section.voiceProfileId ?? null, section.startTime, section.endTime, JSON.stringify(section.timingMarkers), section.order)
+    }
+  })()
   return { ...script, clipId: clipId ?? script.clipId }
 }
 
@@ -326,12 +302,19 @@ export function listScriptsByProject(
     'SELECT * FROM scripts WHERE project_id = ? ORDER BY generated_at DESC',
   ).all(projectId) as Record<string, unknown>[]
 
-  return scriptRows.map((row) => {
-    const sectionRows = db.prepare(
-      'SELECT * FROM script_sections WHERE script_id = ? ORDER BY sort_order ASC',
-    ).all(row.id as string) as Record<string, unknown>[]
+  if (scriptRows.length === 0) return []
 
-    const sections: ScriptSection[] = sectionRows.map((sr) => ({
+  const scriptIds = scriptRows.map((r) => r.id as string)
+  const placeholders = scriptIds.map(() => '?').join(',')
+  const allSectionRows = db.prepare(
+    `SELECT * FROM script_sections WHERE script_id IN (${placeholders}) ORDER BY sort_order ASC`,
+  ).all(...scriptIds) as Record<string, unknown>[]
+
+  const sectionsByScriptId = new Map<string, ScriptSection[]>()
+  for (const sr of allSectionRows) {
+    const sid = sr.script_id as string
+    if (!sectionsByScriptId.has(sid)) sectionsByScriptId.set(sid, [])
+    sectionsByScriptId.get(sid)!.push({
       id: sr.id as string,
       scriptId: sr.script_id as string,
       text: sr.text as string,
@@ -340,16 +323,16 @@ export function listScriptsByProject(
       endTime: sr.end_time as number,
       timingMarkers: JSON.parse((sr.timing_markers as string) || '[]'),
       order: sr.sort_order as number,
-    }))
+    })
+  }
 
-    return {
-      id: row.id as string,
-      projectId: row.project_id as string,
-      clipId: (row.clip_id as string) ?? undefined,
-      aiBackendUsed: row.ai_backend_used as Script['aiBackendUsed'],
-      prompt: row.prompt as string,
-      generatedAt: row.generated_at as string,
-      sections,
-    }
-  })
+  return scriptRows.map((row) => ({
+    id: row.id as string,
+    projectId: row.project_id as string,
+    clipId: (row.clip_id as string) ?? undefined,
+    aiBackendUsed: row.ai_backend_used as Script['aiBackendUsed'],
+    prompt: row.prompt as string,
+    generatedAt: row.generated_at as string,
+    sections: sectionsByScriptId.get(row.id as string) ?? [],
+  }))
 }

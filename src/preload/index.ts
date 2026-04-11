@@ -89,6 +89,7 @@ const api = {
       prompt: string
       context: ScriptGenContext
       projectId: string
+      clipId?: string
     }): Promise<{ success: boolean; script?: Script; error?: string }> =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_SCRIPT, args),
   },
