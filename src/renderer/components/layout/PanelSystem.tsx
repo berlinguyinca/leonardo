@@ -1,6 +1,7 @@
 import { useCallback, useRef } from 'react'
 import type { WorkspacePreset } from '../../stores/ui-store'
 import { useUIStore } from '../../stores/ui-store'
+import { useScriptStore } from '../../stores/script-store'
 import { RecordingBrowser } from '../browser/RecordingBrowser'
 import { PropertiesPanel } from '../properties/PropertiesPanel'
 import { ScriptOnlyView } from '../script-editor/ScriptOnlyView'
@@ -21,6 +22,9 @@ export function PanelSystem({ preset }: PanelSystemProps): React.ReactNode {
   const setTimelineHeight = useUIStore((s) => s.setTimelineHeight)
 
   const editorView = useUIStore((s) => s.editorView)
+
+  const sections = useScriptStore((s) => s.sections)
+  const updateSection = useScriptStore((s) => s.updateSection)
 
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed)
   const propertiesCollapsed = useUIStore((s) => s.propertiesCollapsed)
@@ -153,10 +157,10 @@ export function PanelSystem({ preset }: PanelSystemProps): React.ReactNode {
           {!timelineCollapsed && (
             <div className="panel-content">
               {editorView === 'script-only' && (
-                <ScriptOnlyView sections={[]} onUpdateSection={() => {}} />
+                <ScriptOnlyView sections={sections} onUpdateSection={updateSection} />
               )}
               {editorView === 'dual-pane' && (
-                <DualPaneView sections={[]} onUpdateSection={() => {}} />
+                <DualPaneView sections={sections} onUpdateSection={updateSection} />
               )}
               {editorView === 'inline' && (
                 <InlineEditorView />
