@@ -66,11 +66,11 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
         return
       }
       recorder.onstop = () => {
+        recorder.stream.getTracks().forEach((t) => t.stop())
         resolve(new Blob(chunksRef.current, { type: 'video/webm' }))
       }
-      recorder.stop()
-      recorder.stream.getTracks().forEach((t) => t.stop())
       mediaRecorderRef.current = null
+      recorder.stop()
     })
   }, [])
 
@@ -143,6 +143,9 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
       ])
 
       if (!result.success || !result.recordingId || !result.outputDir) return
+
+      // Skip video pipeline if no video was captured (e.g. screen share denied)
+      if (blob.size === 0) return
 
       // Save the WebM blob to disk
       const buffer = await blob.arrayBuffer()

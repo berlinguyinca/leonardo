@@ -12,6 +12,43 @@ function makeWebviewRef(): React.RefObject<Electron.WebviewTag | null> {
   return { current: null } as React.RefObject<Electron.WebviewTag | null>
 }
 
+// ---- MediaRecorder mock ----
+class MockMediaRecorder {
+  state: 'inactive' | 'recording' | 'paused' = 'inactive'
+  stream: MediaStream
+  mimeType: string
+  ondataavailable: ((e: { data: Blob }) => void) | null = null
+  onstop: (() => void) | null = null
+
+  constructor(stream: MediaStream, options?: { mimeType?: string }) {
+    this.stream = stream
+    this.mimeType = options?.mimeType ?? 'video/webm'
+  }
+
+  start(timeslice?: number) {
+    this.state = 'recording'
+    if (timeslice) {
+      setTimeout(() => {
+        this.ondataavailable?.({ data: new Blob(['chunk'], { type: 'video/webm' }) })
+      }, timeslice)
+    }
+  }
+
+  stop() {
+    this.state = 'inactive'
+    this.onstop?.()
+  }
+}
+
+function makeMockStream(): MediaStream {
+  const track = { stop: vi.fn(), kind: 'video' } as unknown as MediaStreamTrack
+  return {
+    getTracks: () => [track],
+    getVideoTracks: () => [track],
+    getAudioTracks: () => [],
+  } as unknown as MediaStream
+}
+
 // Default mock stop result
 const defaultStopResult = {
   success: true,
@@ -52,6 +89,14 @@ describe('post-recording Edit Now prompt (integration)', () => {
   beforeEach(() => {
     vi.useFakeTimers()
 
+    vi.stubGlobal('MediaRecorder', MockMediaRecorder)
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      mediaDevices: {
+        getDisplayMedia: vi.fn().mockResolvedValue(makeMockStream()),
+      },
+    })
+
     windowMock = setupWindowMock()
 
     useRecordingStore.setState({
@@ -87,14 +132,24 @@ describe('post-recording Edit Now prompt (integration)', () => {
   afterEach(() => {
     vi.useRealTimers()
     vi.clearAllMocks()
+    vi.unstubAllGlobals()
   })
 
   async function triggerStop(webviewRef: React.RefObject<Electron.WebviewTag | null>) {
-    // Move to recording state first
-    useRecordingStore.setState({ status: 'recording' })
-
-    // Render and click stop
+    useRecordingStore.setState({ status: 'idle' })
     const { container } = render(<RecordingControls webviewRef={webviewRef} />)
+
+    // Click Record to initialize the MediaRecorder
+    const recordBtn = screen.getByText('Record')
+    await act(async () => {
+      fireEvent.click(recordBtn)
+    })
+    // Advance past the MediaRecorder timeslice (1000ms) so a data chunk is captured
+    await act(async () => {
+      vi.advanceTimersByTime(1100)
+    })
+
+    // Click Stop
     const stopBtn = screen.getByText('Stop')
     await act(async () => {
       fireEvent.click(stopBtn)
@@ -194,11 +249,21 @@ describe('post-recording Edit Now prompt (integration)', () => {
     setupWindowMock({ success: false, recordingId: '', outputDir: '', duration: 0 })
 
     const webviewRef = makeWebviewRef()
-    useRecordingStore.setState({ status: 'recording' })
+    useRecordingStore.setState({ status: 'idle' })
 
     render(<RecordingControls webviewRef={webviewRef} />)
-    const stopBtn = screen.getByText('Stop')
 
+    // Click Record to initialize the MediaRecorder
+    const recordBtn = screen.getByText('Record')
+    await act(async () => {
+      fireEvent.click(recordBtn)
+    })
+    // Advance past the MediaRecorder timeslice so a data chunk is captured
+    await act(async () => {
+      vi.advanceTimersByTime(1100)
+    })
+
+    const stopBtn = screen.getByText('Stop')
     await act(async () => {
       fireEvent.click(stopBtn)
     })

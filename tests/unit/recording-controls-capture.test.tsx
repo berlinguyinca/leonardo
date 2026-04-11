@@ -139,10 +139,23 @@ describe('RecordingControls — screen capture (unit)', () => {
     expect(window.leonardo.recording.start).toHaveBeenCalled()
   })
 
+  async function startRecording(webviewRef: React.RefObject<Electron.WebviewTag | null>) {
+    const recordBtn = screen.getByText('Record')
+    await act(async () => {
+      fireEvent.click(recordBtn)
+    })
+    // Advance past the MediaRecorder timeslice (1000ms) so a data chunk is captured
+    await act(async () => {
+      vi.advanceTimersByTime(1100)
+    })
+  }
+
   it('calls saveBlob and convert when Stop is clicked after recording', async () => {
     const webviewRef = makeWebviewRef()
-    useRecordingStore.setState({ status: 'recording' })
+    useRecordingStore.setState({ status: 'idle' })
     render(<RecordingControls webviewRef={webviewRef} />)
+
+    await startRecording(webviewRef)
 
     const stopBtn = screen.getByText('Stop')
     await act(async () => {
@@ -164,8 +177,10 @@ describe('RecordingControls — screen capture (unit)', () => {
 
   it('creates a clip with videoPath from convert result', async () => {
     const webviewRef = makeWebviewRef()
-    useRecordingStore.setState({ status: 'recording' })
+    useRecordingStore.setState({ status: 'idle' })
     render(<RecordingControls webviewRef={webviewRef} />)
+
+    await startRecording(webviewRef)
 
     const stopBtn = screen.getByText('Stop')
     await act(async () => {
@@ -180,8 +195,10 @@ describe('RecordingControls — screen capture (unit)', () => {
 
   it('shows "Clip added to library." after successful stop', async () => {
     const webviewRef = makeWebviewRef()
-    useRecordingStore.setState({ status: 'recording' })
+    useRecordingStore.setState({ status: 'idle' })
     render(<RecordingControls webviewRef={webviewRef} />)
+
+    await startRecording(webviewRef)
 
     const stopBtn = screen.getByText('Stop')
     await act(async () => {
@@ -199,8 +216,10 @@ describe('RecordingControls — screen capture (unit)', () => {
     })
 
     const webviewRef = makeWebviewRef()
-    useRecordingStore.setState({ status: 'recording' })
+    useRecordingStore.setState({ status: 'idle' })
     render(<RecordingControls webviewRef={webviewRef} />)
+
+    await startRecording(webviewRef)
 
     const stopBtn = screen.getByText('Stop')
     await act(async () => {
@@ -218,8 +237,10 @@ describe('RecordingControls — screen capture (unit)', () => {
     })
 
     const webviewRef = makeWebviewRef()
-    useRecordingStore.setState({ status: 'recording' })
+    useRecordingStore.setState({ status: 'idle' })
     render(<RecordingControls webviewRef={webviewRef} />)
+
+    await startRecording(webviewRef)
 
     const stopBtn = screen.getByText('Stop')
     await act(async () => {
@@ -246,5 +267,27 @@ describe('RecordingControls — screen capture (unit)', () => {
 
     // Should still be in recording state
     expect(useRecordingStore.getState().status).toBe('recording')
+  })
+
+  it('does not call saveBlob when blob is empty after denied capture', async () => {
+    // Deny screen share so no MediaRecorder is created — blob will be empty
+    ;(navigator.mediaDevices.getDisplayMedia as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error('Permission denied'),
+    )
+
+    const webviewRef = makeWebviewRef()
+    // Start in recording state (as if user already clicked Record and it transitioned)
+    useRecordingStore.setState({ status: 'recording' })
+    render(<RecordingControls webviewRef={webviewRef} />)
+
+    const stopBtn = screen.getByText('Stop')
+    await act(async () => {
+      fireEvent.click(stopBtn)
+    })
+
+    // saveBlob should NOT be called because blob.size === 0
+    expect(window.leonardo.recording.saveBlob).not.toHaveBeenCalled()
+    // Status should end up idle (via finally block)
+    expect(useRecordingStore.getState().status).toBe('idle')
   })
 })
