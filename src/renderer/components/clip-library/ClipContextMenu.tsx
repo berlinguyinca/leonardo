@@ -38,6 +38,7 @@ export function ClipContextMenu({ clip, position, onClose }: ClipContextMenuProp
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
+        e.stopPropagation()
         onClose()
       }
     }
@@ -68,6 +69,8 @@ export function ClipContextMenu({ clip, position, onClose }: ClipContextMenuProp
       } else {
         setGenError(result.error ?? 'Generation failed')
       }
+    } catch (err: unknown) {
+      setGenError(err instanceof Error ? err.message : 'Unexpected error')
     } finally {
       setGenerating(false)
     }
