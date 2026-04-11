@@ -25,7 +25,7 @@ export function registerClipIPC(): void {
       if (!clip) {
         return { success: false, error: 'Clip not found' }
       }
-      const { filePath: outputPath, canceled } = await dialog.showSaveDialog(null as never, {
+      const { filePath: outputPath, canceled } = await dialog.showSaveDialog({
         defaultPath: path.basename(clip.filePath),
       })
       if (canceled || !outputPath) {
