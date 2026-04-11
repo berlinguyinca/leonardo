@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { SegmentContextMenu } from '../../src/renderer/components/timeline/SegmentContextMenu'
 import { Segment } from '../../src/renderer/components/timeline/Segment'
 import type { Segment as SegmentType } from '@shared/types'
@@ -95,6 +95,8 @@ describe('SegmentContextMenu', () => {
     mockSetClipScript.mockClear()
     mockSetEditorView.mockClear()
     mockSetTimelineCollapsed.mockClear()
+    Object.keys(mockClipScripts).forEach((k) => delete mockClipScripts[k])
+    ;(window as Record<string, unknown>).leonardo = undefined
   })
 
   it('renders both menu items', () => {
@@ -137,12 +139,58 @@ describe('SegmentContextMenu', () => {
 
     expect(onClose).toHaveBeenCalledOnce()
   })
+
+  it('handleGenerate success path calls store actions and closes menu', async () => {
+    const section: ScriptSection = {
+      id: 'sec-1',
+      scriptId: 'script-1',
+      text: 'Hello world',
+      voiceProfileId: null,
+      startTime: 0,
+      endTime: 5000,
+      timingMarkers: [],
+      order: 0,
+    }
+    const mockGenerateScript = vi.fn().mockResolvedValue({ success: true, script: { sections: [section] } })
+    ;(window as Record<string, unknown>).leonardo = { ai: { generateScript: mockGenerateScript } }
+
+    render(<SegmentContextMenu segment={mockSegment} position={{ x: 100, y: 200 }} onClose={onClose} />)
+
+    fireEvent.click(screen.getByText('Generate Script'))
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Write a script' } })
+    fireEvent.click(screen.getByText('Generate'))
+
+    await waitFor(() => {
+      expect(mockSetClipScript).toHaveBeenCalledWith('clip-1', [section])
+    })
+    expect(mockSetSections).toHaveBeenCalledWith([section])
+    expect(mockSetEditorView).toHaveBeenCalledWith('script-only')
+    expect(mockSetTimelineCollapsed).toHaveBeenCalledWith(false)
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('handleGenerate error path shows error message in DOM', async () => {
+    const mockGenerateScript = vi.fn().mockResolvedValue({ success: false, error: 'AI error' })
+    ;(window as Record<string, unknown>).leonardo = { ai: { generateScript: mockGenerateScript } }
+
+    render(<SegmentContextMenu segment={mockSegment} position={{ x: 100, y: 200 }} onClose={onClose} />)
+
+    fireEvent.click(screen.getByText('Generate Script'))
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Write a script' } })
+    fireEvent.click(screen.getByText('Generate'))
+
+    await waitFor(() => {
+      expect(screen.getByText('AI error')).toBeInTheDocument()
+    })
+    expect(onClose).not.toHaveBeenCalled()
+  })
 })
 
 describe('Segment right-click and script overlay', () => {
   beforeEach(() => {
     mockRemoveSegment.mockClear()
     mockSetSelectedSegment.mockClear()
+    Object.keys(mockClipScripts).forEach((k) => delete mockClipScripts[k])
   })
 
   it('right-clicking a segment shows the context menu', () => {
@@ -176,9 +224,6 @@ describe('Segment right-click and script overlay', () => {
     expect(preview!.textContent).toBe(
       'This is a test script section that should be truncated after eighty characters i',
     )
-
-    // Clean up
-    delete mockClipScripts['clip-1']
   })
 
   it('script overlay does not render when no clipScripts for the clip', () => {
