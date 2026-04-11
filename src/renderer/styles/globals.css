@@ -1293,3 +1293,59 @@ body {
   color: var(--text-muted);
   margin-top: 4px;
 }
+
+/* Log Viewer */
+.log-viewer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.log-viewer-modal {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 80vw;
+  max-width: 1000px;
+  height: 70vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.log-viewer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel-header);
+}
+
+.log-viewer-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.log-viewer-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.log-viewer-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px;
+  margin: 0;
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-all;
+}

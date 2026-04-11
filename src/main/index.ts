@@ -3,7 +3,10 @@ import { join } from 'path'
 import { registerProjectIPC } from './ipc/project.ipc'
 import { registerRecordingIPC } from './ipc/recording.ipc'
 import { registerAIIPC } from './ipc/ai.ipc'
+import { registerClipIPC } from './ipc/clip.ipc'
+import { registerLogIPC } from './ipc/log.ipc'
 import { initDatabase, closeDatabase } from './services/project-store'
+import { initLogger } from './utils/logger'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -43,10 +46,13 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  initLogger()
   initDatabase()
   registerProjectIPC()
   registerRecordingIPC()
   registerAIIPC()
+  registerClipIPC()
+  registerLogIPC()
   createWindow()
 
   app.on('activate', () => {

@@ -18,7 +18,12 @@ export function ClipLibrary(): React.ReactNode {
   const clips = useLibraryStore((s) => s.clips)
   const highlightedClipId = useLibraryStore((s) => s.highlightedClipId)
   const setHighlightedClip = useLibraryStore((s) => s.setHighlightedClip)
+  const loadClips = useLibraryStore((s) => s.loadClips)
   const addClipToTimeline = useTimelineStore((s) => s.addClipToTimeline)
+
+  useEffect(() => {
+    loadClips()
+  }, [loadClips])
 
   useEffect(() => {
     if (!highlightedClipId) return

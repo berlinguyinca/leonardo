@@ -8,6 +8,7 @@ export function Toolbar(): React.ReactNode {
   const workspacePreset = useUIStore((s) => s.workspacePreset)
   const setWorkspacePreset = useUIStore((s) => s.setWorkspacePreset)
   const setShowProjectWizard = useUIStore((s) => s.setShowProjectWizard)
+  const setShowLogViewer = useUIStore((s) => s.setShowLogViewer)
 
   const presets: WorkspacePreset[] = ['recording', 'editing', 'export']
 
@@ -37,6 +38,13 @@ export function Toolbar(): React.ReactNode {
 
       <div className="toolbar-right">
         <ViewModeToggle />
+        <button
+          className="toolbar-btn"
+          onClick={() => setShowLogViewer(true)}
+          title="View application log"
+        >
+          Logs
+        </button>
         <button
           className="toolbar-btn toolbar-theme-toggle"
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}

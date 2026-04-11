@@ -28,6 +28,10 @@ export const IPC_CHANNELS = {
   WORKER_STATUS: 'worker:status',
   ARCHIVE_EXPORT: 'archive:export',
   ARCHIVE_IMPORT: 'archive:import',
+  CLIP_CREATE: 'clip:create',
+  CLIP_LIST: 'clip:list',
+  CLIP_DELETE: 'clip:delete',
+  LOG_READ: 'log:read',
 } as const
 
 export const TIMELINE_MIN_ZOOM = 0.1

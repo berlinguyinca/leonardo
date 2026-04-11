@@ -60,10 +60,16 @@ describe('timeline-store: addClipToTimeline', () => {
     useTimelineStore.setState({ timeline: null })
   })
 
-  it('is a no-op when timeline is null', () => {
-    const clip = makeClip()
+  it('auto-creates a timeline when timeline is null', () => {
+    const clip = makeClip({ projectId: 'proj-1' })
     useTimelineStore.getState().addClipToTimeline(clip)
-    expect(useTimelineStore.getState().timeline).toBeNull()
+    const state = useTimelineStore.getState()
+    expect(state.timeline).not.toBeNull()
+    expect(state.timeline!.projectId).toBe('proj-1')
+    expect(state.timeline!.tracks).toHaveLength(1)
+    expect(state.timeline!.tracks[0].segments).toHaveLength(1)
+    expect(state.timeline!.tracks[0].segments[0].startTime).toBe(0)
+    expect(state.timeline!.tracks[0].segments[0].endTime).toBe(clip.duration)
   })
 
   it('creates a new clip track when no clip or recording track exists', () => {

@@ -106,7 +106,7 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
           createdAt: new Date().toISOString(),
           label: `Recording ${currentClipCount + 1}`,
         }
-        addClip(clip)
+        await addClip(clip)
         setHighlightedClip(clip.id)
         setPendingClip(clip)
       }

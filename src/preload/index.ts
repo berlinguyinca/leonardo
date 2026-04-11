@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IPC_CHANNELS } from '@shared/constants'
 import type { Project, InputModeType, Resolution } from '@shared/types/project'
 import type { ArchiveImportResult } from '../main/services/archive'
+import type { Clip } from '@shared/types/events'
 
 const api = {
   project: {
@@ -61,6 +62,18 @@ const api = {
       status: string
       duration: number
     }> => ipcRenderer.invoke(IPC_CHANNELS.WORKER_STATUS),
+  },
+  clip: {
+    create: (clip: Clip): Promise<Clip> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLIP_CREATE, clip),
+    list: (): Promise<Clip[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLIP_LIST),
+    delete: (id: string): Promise<boolean> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLIP_DELETE, id),
+  },
+  log: {
+    read: (): Promise<string> =>
+      ipcRenderer.invoke(IPC_CHANNELS.LOG_READ),
   },
 }
 

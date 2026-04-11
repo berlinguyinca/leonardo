@@ -15,6 +15,7 @@ interface UIState {
   workspacePreset: WorkspacePreset
   editorView: EditorView
   showProjectWizard: boolean
+  showLogViewer: boolean
   sidebarWidth: number
   timelineHeight: number
   sidebarCollapsed: boolean
@@ -26,6 +27,7 @@ interface UIState {
   setWorkspacePreset: (preset: WorkspacePreset) => void
   setEditorView: (view: EditorView) => void
   setShowProjectWizard: (show: boolean) => void
+  setShowLogViewer: (show: boolean) => void
   setSidebarWidth: (width: number) => void
   setTimelineHeight: (height: number) => void
   setSidebarCollapsed: (collapsed: boolean) => void
@@ -40,6 +42,7 @@ export const useUIStore = create<UIState>((set) => ({
   workspacePreset: 'editing',
   editorView: 'dual-pane',
   showProjectWizard: false,
+  showLogViewer: false,
   sidebarWidth: 260,
   timelineHeight: 300,
   sidebarCollapsed: false,
@@ -51,6 +54,7 @@ export const useUIStore = create<UIState>((set) => ({
   setWorkspacePreset: (preset) => set({ workspacePreset: preset }),
   setEditorView: (view) => set({ editorView: view }),
   setShowProjectWizard: (show) => set({ showProjectWizard: show }),
+  setShowLogViewer: (show) => set({ showLogViewer: show }),
   setSidebarWidth: (width) => set({ sidebarWidth: width }),
   setTimelineHeight: (height) => set({ timelineHeight: height }),
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),

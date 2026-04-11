@@ -95,10 +95,18 @@ export const useTimelineStore = create<TimelineState>()(
         }),
       addClipToTimeline: (clip, insertTimeMs) =>
         set((state) => {
-          if (!state.timeline) return state
           if (clip.duration <= 0) return state
 
-          const existingTrack = state.timeline.tracks.find(
+          const timeline = state.timeline ?? {
+            id: crypto.randomUUID(),
+            projectId: clip.projectId || '',
+            tracks: [],
+            syncPoints: [],
+            duration: 0,
+            reviewed: false,
+          }
+
+          const existingTrack = timeline.tracks.find(
             (t) => t.type === 'clip' || t.type === 'recording',
           )
 
@@ -126,8 +134,8 @@ export const useTimelineStore = create<TimelineState>()(
           if (existingTrack) {
             return {
               timeline: {
-                ...state.timeline,
-                tracks: state.timeline.tracks.map((t) =>
+                ...timeline,
+                tracks: timeline.tracks.map((t) =>
                   t.id === existingTrack.id
                     ? { ...t, segments: [...t.segments, segment] }
                     : t,
@@ -148,8 +156,8 @@ export const useTimelineStore = create<TimelineState>()(
 
           return {
             timeline: {
-              ...state.timeline,
-              tracks: [...state.timeline.tracks, newTrack],
+              ...timeline,
+              tracks: [...timeline.tracks, newTrack],
             },
           }
         }),

@@ -3,6 +3,7 @@ import { app } from 'electron'
 import { join } from 'path'
 import { DB_FILENAME } from '@shared/constants'
 import type { Project, InputModeType, Resolution } from '@shared/types'
+import type { Clip } from '@shared/types/events'
 
 let db: Database.Database | null = null
 
@@ -108,6 +109,15 @@ function runMigrations(db: Database.Database): void {
       value TEXT NOT NULL
     );
   `)
+
+  // Idempotent column additions for clips table (added in v2)
+  for (const sql of [
+    `ALTER TABLE clips ADD COLUMN url TEXT NOT NULL DEFAULT ''`,
+    `ALTER TABLE clips ADD COLUMN resolution_width INTEGER NOT NULL DEFAULT 1920`,
+    `ALTER TABLE clips ADD COLUMN resolution_height INTEGER NOT NULL DEFAULT 1080`,
+  ]) {
+    try { db.exec(sql) } catch { /* column already exists */ }
+  }
 }
 
 // --- Project CRUD ---
@@ -202,5 +212,54 @@ function rowToProject(row: Record<string, unknown>): Project {
       label: row.recording_resolution_label as string,
     },
     exportConfig: row.export_config ? JSON.parse(row.export_config as string) : null,
+  }
+}
+
+// --- Clip CRUD ---
+
+export function createClip(clip: Clip): Clip {
+  const db = getDatabase()
+  db.prepare(`
+    INSERT INTO clips (id, name, file_path, type, duration, project_id, is_global, created_at, url, resolution_width, resolution_height)
+    VALUES (?, ?, ?, 'video', ?, ?, 0, ?, ?, ?, ?)
+  `).run(
+    clip.id,
+    clip.label,
+    clip.filePath,
+    clip.duration,
+    clip.projectId || null,
+    clip.createdAt,
+    clip.url,
+    clip.resolution.width,
+    clip.resolution.height,
+  )
+  return clip
+}
+
+export function listClips(): Clip[] {
+  const db = getDatabase()
+  const rows = db.prepare('SELECT * FROM clips ORDER BY created_at DESC').all() as Record<string, unknown>[]
+  return rows.map(rowToClip)
+}
+
+export function deleteClip(id: string): boolean {
+  const db = getDatabase()
+  const result = db.prepare('DELETE FROM clips WHERE id = ?').run(id)
+  return result.changes > 0
+}
+
+function rowToClip(row: Record<string, unknown>): Clip {
+  return {
+    id: row.id as string,
+    projectId: (row.project_id as string) || '',
+    filePath: row.file_path as string,
+    duration: row.duration as number,
+    url: (row.url as string) || '',
+    resolution: {
+      width: (row.resolution_width as number) || 1920,
+      height: (row.resolution_height as number) || 1080,
+    },
+    createdAt: row.created_at as string,
+    label: row.name as string,
   }
 }
