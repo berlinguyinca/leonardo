@@ -19,6 +19,14 @@ export default defineConfig({
         '@shared': resolve('src/shared'),
       },
     },
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve('src/preload/index.ts'),
+          'webview-preload': resolve('src/preload/webview-preload.ts'),
+        },
+      },
+    },
   },
   renderer: {
     plugins: [react()],
