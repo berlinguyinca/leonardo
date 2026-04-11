@@ -34,26 +34,30 @@ function makeWebviewRef(): React.RefObject<Electron.WebviewTag | null> {
 }
 
 function setupWindowMock() {
-  Object.defineProperty(global, 'window', {
-    value: {
-      ...global.window,
-      leonardo: {
-        recording: {
-          start: vi.fn().mockResolvedValue(undefined),
-          stop: vi.fn().mockResolvedValue({
-            success: true,
-            recordingId: 'rec-1',
-            outputDir: '/tmp/recordings/rec-1',
-            duration: 5000,
-          }),
-          pause: vi.fn(),
-          resume: vi.fn(),
-        },
-      },
+  ;(window as Record<string, unknown>)['leonardo'] = {
+    recording: {
+      start: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn().mockResolvedValue({
+        success: true,
+        recordingId: 'rec-1',
+        outputDir: '/tmp/recordings/rec-1',
+        duration: 5000,
+      }),
+      pause: vi.fn(),
+      resume: vi.fn(),
+      saveBlob: vi.fn().mockResolvedValue({
+        success: true,
+        webmPath: '/tmp/recordings/rec-1/recording.webm',
+      }),
+      convert: vi.fn().mockResolvedValue({
+        success: true,
+        videoPath: '/tmp/recordings/rec-1/recording.mp4',
+        eventsPath: '/tmp/recordings/rec-1/recording.events.json',
+      }),
+      relayDomEvent: vi.fn(),
+      getWebviewPreloadPath: vi.fn().mockResolvedValue('/path/to/webview-preload.js'),
     },
-    writable: true,
-    configurable: true,
-  })
+  }
 }
 
 describe('add to timeline — view navigation', () => {

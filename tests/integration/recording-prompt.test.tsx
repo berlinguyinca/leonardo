@@ -28,14 +28,21 @@ function setupWindowMock(stopResult = defaultStopResult) {
         stop: vi.fn().mockResolvedValue(stopResult),
         pause: vi.fn(),
         resume: vi.fn(),
+        saveBlob: vi.fn().mockResolvedValue({
+          success: true,
+          webmPath: `${stopResult.outputDir ?? '/tmp/recordings'}/recording.webm`,
+        }),
+        convert: vi.fn().mockResolvedValue({
+          success: true,
+          videoPath: `${stopResult.outputDir ?? '/tmp/recordings'}/recording.mp4`,
+          eventsPath: `${stopResult.outputDir ?? '/tmp/recordings'}/recording.events.json`,
+        }),
+        relayDomEvent: vi.fn(),
+        getWebviewPreloadPath: vi.fn().mockResolvedValue('/path/to/webview-preload.js'),
       },
     },
   }
-  Object.defineProperty(global, 'window', {
-    value: { ...global.window, ...mock },
-    writable: true,
-    configurable: true,
-  })
+  ;(window as Record<string, unknown>)['leonardo'] = mock.leonardo
   return mock
 }
 

@@ -8,8 +8,15 @@ export function RecordingBrowser(): React.ReactNode {
   const [canGoBack, setCanGoBack] = useState(false)
   const [canGoForward, setCanGoForward] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [webviewPreloadPath, setWebviewPreloadPath] = useState<string | null>(null)
   const setCurrentUrl = useRecordingStore((s) => s.setCurrentUrl)
   const targetResolution = useRecordingStore((s) => s.targetResolution)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.leonardo?.recording?.getWebviewPreloadPath) {
+      window.leonardo.recording.getWebviewPreloadPath().then(setWebviewPreloadPath)
+    }
+  }, [])
 
   const navigateTo = useCallback(
     (url: string) => {
@@ -51,16 +58,25 @@ export function RecordingBrowser(): React.ReactNode {
       onNavigate()
     }
 
+    const onIpcMessage = (e: Event): void => {
+      const ipcEvent = e as Electron.IpcMessageEvent
+      if (ipcEvent.channel === 'dom-event') {
+        window.leonardo.recording.relayDomEvent(ipcEvent.args[0])
+      }
+    }
+
     webview.addEventListener('did-navigate', onNavigate)
     webview.addEventListener('did-navigate-in-page', onNavigate)
     webview.addEventListener('did-start-loading', onStartLoading)
     webview.addEventListener('did-stop-loading', onStopLoading)
+    webview.addEventListener('ipc-message', onIpcMessage)
 
     return () => {
       webview.removeEventListener('did-navigate', onNavigate)
       webview.removeEventListener('did-navigate-in-page', onNavigate)
       webview.removeEventListener('did-start-loading', onStartLoading)
       webview.removeEventListener('did-stop-loading', onStopLoading)
+      webview.removeEventListener('ipc-message', onIpcMessage)
     }
   }, [setCurrentUrl])
 
@@ -123,6 +139,7 @@ export function RecordingBrowser(): React.ReactNode {
           style={{ width: '100%', height: '100%' }}
           /* @ts-expect-error webview attributes are not fully typed */
           allowpopups="true"
+          {...(webviewPreloadPath ? { preload: webviewPreloadPath } : {})}
         />
       </div>
 

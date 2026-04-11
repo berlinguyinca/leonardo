@@ -41,6 +41,9 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
   const [pausedDuration, setPausedDuration] = useState(0)
   const [pendingClip, setPendingClip] = useState<Clip | null>(null)
 
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+
   const startTimer = useCallback(() => {
     startTimeRef.current = Date.now() - pausedDuration
     timerRef.current = setInterval(() => {
@@ -55,9 +58,29 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
     }
   }, [])
 
+  const stopMediaRecorder = useCallback((): Promise<Blob> => {
+    return new Promise((resolve) => {
+      const recorder = mediaRecorderRef.current
+      if (!recorder || recorder.state === 'inactive') {
+        resolve(new Blob([], { type: 'video/webm' }))
+        return
+      }
+      recorder.onstop = () => {
+        resolve(new Blob(chunksRef.current, { type: 'video/webm' }))
+      }
+      recorder.stop()
+      recorder.stream.getTracks().forEach((t) => t.stop())
+      mediaRecorderRef.current = null
+    })
+  }, [])
+
   useEffect(() => {
-    return () => stopTimer()
-  }, [stopTimer])
+    return () => {
+      stopTimer()
+      // Stop media recorder if component unmounts during recording
+      void stopMediaRecorder()
+    }
+  }, [stopTimer, stopMediaRecorder])
 
   useEffect(() => {
     if (!pendingClip) return
@@ -72,10 +95,26 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
     startTimer()
     collapseAllPanels()
 
-    // Signal main process to begin capture
     await window.leonardo.recording.start({
       webviewId: webviewRef.current?.getWebContentsId() ?? -1,
     })
+
+    // Start screen capture via MediaRecorder
+    try {
+      chunksRef.current = []
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: 30 } as MediaTrackConstraints,
+      })
+      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' })
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data)
+      }
+      recorder.start(1000) // collect a chunk every second
+      mediaRecorderRef.current = recorder
+    } catch (err) {
+      // If screen capture fails (e.g. user denied), continue recording without video
+      console.warn('[RecordingControls] Screen capture failed:', err)
+    }
   }, [setStatus, setRecordingDuration, startTimer, collapseAllPanels, webviewRef])
 
   const handlePause = useCallback(() => {
@@ -97,14 +136,40 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
     stopTimer()
     setStatus('processing')
     try {
-      const result = await window.leonardo.recording.stop()
+      // Stop both the recorder and the IPC session in parallel
+      const [blob, result] = await Promise.all([
+        stopMediaRecorder(),
+        window.leonardo.recording.stop(),
+      ])
 
-      if (result.success && result.recordingId) {
+      if (!result.success || !result.recordingId || !result.outputDir) return
+
+      // Save the WebM blob to disk
+      const buffer = await blob.arrayBuffer()
+      const saveResult = await window.leonardo.recording.saveBlob({
+        outputDir: result.outputDir,
+        buffer,
+      })
+
+      if (!saveResult.success) {
+        console.warn('[RecordingControls] Failed to save blob:', saveResult.error)
+        return
+      }
+
+      // Convert WebM → MP4 and persist .events.json
+      const convertResult = await window.leonardo.recording.convert({
+        recordingId: result.recordingId,
+        webmPath: saveResult.webmPath,
+        outputDir: result.outputDir,
+        projectId: activeProjectId ?? '',
+      })
+
+      if (convertResult.success && convertResult.videoPath) {
         const currentClipCount = useLibraryStore.getState().clips.length
         const clip: Clip = {
           id: result.recordingId,
           projectId: activeProjectId ?? '',
-          filePath: result.outputDir ? `${result.outputDir}/recording.webm` : '',
+          filePath: convertResult.videoPath,
           duration: result.duration ?? recordingDuration,
           url: currentUrl,
           resolution: { width: targetResolution.width, height: targetResolution.height },
@@ -119,7 +184,10 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
       restorePanelState()
       setStatus('idle')
     }
-  }, [setStatus, stopTimer, recordingDuration, currentUrl, targetResolution, addClip, setHighlightedClip, restorePanelState])
+  }, [
+    stopTimer, setStatus, stopMediaRecorder, activeProjectId, recordingDuration,
+    currentUrl, targetResolution, addClip, setHighlightedClip, restorePanelState,
+  ])
 
   const isRecording = status === 'recording'
   const isPaused = status === 'paused'
