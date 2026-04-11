@@ -23,7 +23,18 @@ let currentSession: RecordingSession | null = null
 // Store DOM events by recording ID so recording:convert can retrieve them
 const pendingEvents: Map<string, DOMEvent[]> = new Map()
 
+let registered = false
+
+/** Reset module state — for use in unit tests only. */
+export function _resetRegistrationForTesting(): void {
+  registered = false
+  currentSession = null
+  pendingEvents.clear()
+}
+
 export function registerRecordingIPC(): void {
+  if (registered) return
+  registered = true
   ipcMain.handle(
     IPC_CHANNELS.RECORDING_START,
     async (_event, args: { webviewId: number; projectId?: string }) => {
@@ -31,10 +42,12 @@ export function registerRecordingIPC(): void {
         return { success: false, error: 'Recording already in progress' }
       }
 
+      // Clear any stale pending events from a previous abandoned recording
+      pendingEvents.clear()
+
       const recordingId = uuidv4()
       const outputDir = join(app.getPath('userData'), 'recordings', recordingId)
-      const { mkdirSync } = require('fs')
-      mkdirSync(outputDir, { recursive: true })
+      fs.mkdirSync(outputDir, { recursive: true })
 
       currentSession = {
         id: recordingId,
@@ -138,9 +151,13 @@ export function registerRecordingIPC(): void {
   ipcMain.handle(
     'recording:save-blob',
     async (_event, args: { outputDir: string; buffer: ArrayBuffer }) => {
-      const webmPath = join(args.outputDir, 'recording.webm')
-      await fs.promises.writeFile(webmPath, Buffer.from(args.buffer))
-      return { success: true, webmPath }
+      try {
+        const webmPath = join(args.outputDir, 'recording.webm')
+        await fs.promises.writeFile(webmPath, Buffer.from(args.buffer))
+        return { success: true, webmPath }
+      } catch (err) {
+        return { success: false, error: (err as Error).message, webmPath: '' }
+      }
     },
   )
 

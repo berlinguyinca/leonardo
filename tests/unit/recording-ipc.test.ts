@@ -58,7 +58,7 @@ vi.mock('@shared/constants', () => ({
   },
 }))
 
-import { stopCapture } from '@main/services/dom-capture'
+import { stopCapture, handleDOMEvent, isLeonardoEvent } from '@main/services/dom-capture'
 import type { DOMEvent } from '@shared/types/events'
 
 // Helper to invoke a registered ipcMain.handle handler
@@ -68,15 +68,23 @@ async function invokeHandle(channel: string, args?: unknown): Promise<unknown> {
   return handler({} /* _event */, args)
 }
 
+// Helper to invoke a registered ipcMain.on listener
+function emitOn(channel: string, data?: unknown): void {
+  const listener = mockIpcListeners.get(channel)
+  if (!listener) throw new Error(`No listener registered for channel: ${channel}`)
+  listener({} /* _event */, data)
+}
+
 // Import registerRecordingIPC after all mocks are set up
-import { registerRecordingIPC } from '@main/ipc/recording.ipc'
+import { registerRecordingIPC, _resetRegistrationForTesting } from '@main/ipc/recording.ipc'
 
 describe('recording IPC handlers', () => {
   beforeEach(() => {
     mockIpcHandlers.clear()
     mockIpcListeners.clear()
     vi.clearAllMocks()
-    // Re-register handlers fresh for each test
+    // Reset registration guard so handlers re-register fresh for each test
+    _resetRegistrationForTesting()
     registerRecordingIPC()
   })
 
@@ -199,6 +207,42 @@ describe('recording IPC handlers', () => {
   describe('dom-event-relay listener', () => {
     it('registers a dom-event-relay listener on ipcMain', () => {
       expect(mockIpcListeners.has('dom-event-relay')).toBe(true)
+    })
+
+    it('calls handleDOMEvent when session is active and data is a valid Leonardo event', async () => {
+      vi.mocked(isLeonardoEvent).mockReturnValue(true)
+
+      const sampleEvent: DOMEvent = {
+        id: 'e2',
+        type: 'click',
+        timestamp: 2000,
+        elementSelector: 'div',
+        coordinates: { x: 5, y: 10 },
+      }
+
+      // Start a session so currentSession is set
+      await invokeHandle('recording:start', { webviewId: 7, projectId: 'proj-x' })
+
+      emitOn('dom-event-relay', sampleEvent)
+
+      expect(handleDOMEvent).toHaveBeenCalledWith(7, sampleEvent)
+    })
+
+    it('does NOT call handleDOMEvent when no session is active', () => {
+      vi.mocked(isLeonardoEvent).mockReturnValue(true)
+
+      const sampleEvent: DOMEvent = {
+        id: 'e3',
+        type: 'click',
+        timestamp: 3000,
+        elementSelector: 'span',
+        coordinates: { x: 1, y: 2 },
+      }
+
+      // No session started — emitting should be a no-op
+      emitOn('dom-event-relay', sampleEvent)
+
+      expect(handleDOMEvent).not.toHaveBeenCalled()
     })
   })
 })

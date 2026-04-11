@@ -35,8 +35,12 @@ function createWindow(): void {
   // Auto-approve screen capture requests for recording
   mainWindow.webContents.session.setDisplayMediaRequestHandler((_request, callback) => {
     desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
+      if (sources.length === 0) {
+        callback({})
+        return
+      }
       callback({ video: sources[0] })
-    })
+    }).catch(() => callback({}))
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
