@@ -1,6 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import type { Clip } from '@shared/types/events'
 import { useLibraryStore } from '../../stores/library-store'
 import { useTimelineStore } from '../../stores/timeline-store'
+import { ClipContextMenu } from './ClipContextMenu'
 
 function formatDuration(ms: number): string {
   const seconds = Math.floor(ms / 1000)
@@ -20,6 +22,7 @@ export function ClipLibrary(): React.ReactNode {
   const setHighlightedClip = useLibraryStore((s) => s.setHighlightedClip)
   const loadClips = useLibraryStore((s) => s.loadClips)
   const addClipToTimeline = useTimelineStore((s) => s.addClipToTimeline)
+  const [contextMenu, setContextMenu] = useState<{ clip: Clip; x: number; y: number } | null>(null)
 
   useEffect(() => {
     loadClips()
@@ -47,6 +50,10 @@ export function ClipLibrary(): React.ReactNode {
           className={`clip-card ${highlightedClipId === clip.id ? 'clip-highlighted' : ''}`}
           draggable
           onDoubleClick={() => addClipToTimeline(clip)}
+          onContextMenu={(e) => {
+            e.preventDefault()
+            setContextMenu({ clip, x: e.clientX, y: e.clientY })
+          }}
           onDragStart={(e) => {
             e.dataTransfer.setData('application/clip-id', clip.id)
             e.dataTransfer.effectAllowed = 'copy'
@@ -62,6 +69,13 @@ export function ClipLibrary(): React.ReactNode {
           </div>
         </div>
       ))}
+      {contextMenu && (
+        <ClipContextMenu
+          clip={contextMenu.clip}
+          position={{ x: contextMenu.x, y: contextMenu.y }}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   )
 }
