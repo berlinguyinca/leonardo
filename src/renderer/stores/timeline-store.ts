@@ -25,6 +25,7 @@ interface TimelineState {
   addTrack: (track: Track) => void
   removeTrack: (id: string) => void
   removeSegment: (segmentId: string) => void
+  removeSegmentsBySourceFile: (sourceFile: string) => void
   addClipToTimeline: (clip: Clip, insertTimeMs?: number) => void
 }
 
@@ -117,6 +118,21 @@ export const useTimelineStore = create<TimelineState>()(
             },
           }
         }),
+      removeSegmentsBySourceFile: (sourceFile) =>
+        set((state) => {
+          if (!state.timeline) return state
+          const updatedTracks = state.timeline.tracks.map((t) => ({
+            ...t,
+            segments: t.segments.filter((s) => s.sourceFile !== sourceFile),
+          }))
+          return {
+            timeline: {
+              ...state.timeline,
+              tracks: updatedTracks,
+              duration: computeDuration(updatedTracks),
+            },
+          }
+        }),
       addClipToTimeline: (clip, insertTimeMs) =>
         set((state) => {
           if (clip.duration <= 0) return state
@@ -193,3 +209,20 @@ export const useTimelineStore = create<TimelineState>()(
     { limit: UNDO_HISTORY_LIMIT },
   ),
 )
+
+// --- Auto-save subscriber: persist timeline to DB on changes ---
+let prevTimeline: SyncTimeline | null = null
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+const DEBOUNCE_MS = 1000
+
+useTimelineStore.subscribe((state) => {
+  if (state.timeline !== prevTimeline && state.timeline) {
+    prevTimeline = state.timeline
+    if (saveTimer) clearTimeout(saveTimer)
+    saveTimer = setTimeout(() => {
+      if (typeof window !== 'undefined' && window.leonardo?.timeline) {
+        window.leonardo.timeline.save(state.timeline!)
+      }
+    }, DEBOUNCE_MS)
+  }
+})

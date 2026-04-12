@@ -1,12 +1,18 @@
-import { app, BrowserWindow, shell, desktopCapturer } from 'electron'
+import { app, BrowserWindow, shell, protocol, net } from 'electron'
 import { join } from 'path'
 import { registerProjectIPC } from './ipc/project.ipc'
 import { registerRecordingIPC } from './ipc/recording.ipc'
 import { registerAIIPC } from './ipc/ai.ipc'
 import { registerClipIPC } from './ipc/clip.ipc'
 import { registerLogIPC } from './ipc/log.ipc'
+import { registerTimelineIPC } from './ipc/timeline.ipc'
 import { initDatabase, closeDatabase } from './services/project-store'
 import { initLogger } from './utils/logger'
+
+// Register media:// scheme before app ready — enables streaming local video/image files
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'media', privileges: { stream: true, bypassCSP: true, supportFetchAPI: true } },
+])
 
 let mainWindow: BrowserWindow | null = null
 
@@ -21,7 +27,7 @@ function createWindow(): void {
     backgroundColor: '#1a1a2e',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
+      sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
       webviewTag: true,
@@ -30,17 +36,6 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show()
-  })
-
-  // Auto-approve screen capture requests for recording
-  mainWindow.webContents.session.setDisplayMediaRequestHandler((_request, callback) => {
-    desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
-      if (sources.length === 0) {
-        callback({})
-        return
-      }
-      callback({ video: sources[0] })
-    }).catch(() => callback({}))
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -59,11 +54,19 @@ function createWindow(): void {
 app.whenReady().then(() => {
   initLogger()
   initDatabase()
+
+  // Serve local media files via media:// protocol (works in both dev and production)
+  protocol.handle('media', (request) => {
+    // filePath is absolute (starts with /), so file:// + /path = file:///path (correct)
+    const filePath = decodeURIComponent(request.url.slice('media:///'.length))
+    return net.fetch(`file://${filePath}`)
+  })
   registerProjectIPC()
   registerRecordingIPC()
   registerAIIPC()
   registerClipIPC()
   registerLogIPC()
+  registerTimelineIPC()
   createWindow()
 
   app.on('activate', () => {

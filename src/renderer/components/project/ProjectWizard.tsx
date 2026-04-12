@@ -51,6 +51,7 @@ export function ProjectWizard(): React.ReactNode {
     })
     addProject(project)
     setActiveProject(project.id)
+    window.leonardo?.settings?.set('lastActiveProjectId', project.id)
     setShowProjectWizard(false)
     setName('')
     setSelectedMode('record-first')

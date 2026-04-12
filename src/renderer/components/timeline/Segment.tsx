@@ -30,8 +30,7 @@ export function Segment({ segment, zoomLevel, scrollOffset, snapTargets: _snapTa
   const clip = clips.find((c) => c.filePath === segment.sourceFile)
 
   const handleClick = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation()
+    () => {
       setSelectedSegment(segment.id)
     },
     [segment.id, setSelectedSegment],

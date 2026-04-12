@@ -3,102 +3,63 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { useRecordingStore } from '@renderer/stores/recording-store'
 import { useLibraryStore } from '@renderer/stores/library-store'
+import { useProjectStore } from '@renderer/stores/project-store'
 import { RecordingControls } from '@renderer/components/browser/RecordingControls'
 import React from 'react'
 
-// ---- MediaRecorder mock ----
-class MockMediaRecorder {
-  state: 'inactive' | 'recording' | 'paused' = 'inactive'
-  stream: MediaStream
-  mimeType: string
-  ondataavailable: ((e: { data: Blob }) => void) | null = null
-  onstop: (() => void) | null = null
-
-  constructor(stream: MediaStream, options?: { mimeType?: string }) {
-    this.stream = stream
-    this.mimeType = options?.mimeType ?? 'video/webm'
-  }
-
-  start(timeslice?: number) {
-    this.state = 'recording'
-    if (timeslice) {
-      // Simulate one data chunk immediately
-      setTimeout(() => {
-        this.ondataavailable?.({ data: new Blob(['chunk'], { type: 'video/webm' }) })
-      }, timeslice)
-    }
-  }
-
-  stop() {
-    this.state = 'inactive'
-    this.onstop?.()
-  }
-}
-
-function makeWebviewRef(): React.RefObject<Electron.WebviewTag | null> {
-  return { current: null } as React.RefObject<Electron.WebviewTag | null>
-}
-
-function makeWebviewRefWithId(id = 42): React.RefObject<Electron.WebviewTag | null> {
+function makeWebviewRef(id = 42): React.RefObject<Electron.WebviewTag | null> {
   return {
     current: { getWebContentsId: () => id } as unknown as Electron.WebviewTag,
   } as React.RefObject<Electron.WebviewTag | null>
 }
 
-function makeMockStream(): MediaStream {
-  const track = { stop: vi.fn(), kind: 'video' } as unknown as MediaStreamTrack
-  return {
-    getTracks: () => [track],
-    getVideoTracks: () => [track],
-    getAudioTracks: () => [],
-  } as unknown as MediaStream
+type RecordingBridge = {
+  start: ReturnType<typeof vi.fn>
+  stop: ReturnType<typeof vi.fn>
+  pause: ReturnType<typeof vi.fn>
+  resume: ReturnType<typeof vi.fn>
+  relayDomEvent: ReturnType<typeof vi.fn>
+  getWebviewPreloadPath: ReturnType<typeof vi.fn>
 }
 
-function setupWindowMock(overrides: Record<string, unknown> = {}) {
-  const mockStream = makeMockStream()
-  vi.stubGlobal('MediaRecorder', MockMediaRecorder)
-  vi.stubGlobal('navigator', {
-    ...navigator,
-    mediaDevices: {
-      getDisplayMedia: vi.fn().mockResolvedValue(mockStream),
-    },
-  })
-
-  const defaultRecording = {
-    start: vi.fn().mockResolvedValue(undefined),
+function setupWindowMock(stopOverride?: Partial<{ success: boolean; recordingId: string; videoPath: string; duration: number }>): RecordingBridge {
+  const recording: RecordingBridge = {
+    start: vi.fn().mockResolvedValue({ success: true, recordingId: 'rec-123', outputDir: '/tmp/rec-123' }),
     stop: vi.fn().mockResolvedValue({
       success: true,
-      recordingId: 'rec-test-123',
-      outputDir: '/tmp/recordings/rec-test-123',
+      recordingId: 'rec-123',
+      videoPath: '/tmp/rec-123/recording.mp4',
       duration: 5000,
+      ...stopOverride,
     }),
-    pause: vi.fn(),
-    resume: vi.fn(),
-    saveBlob: vi.fn().mockResolvedValue({
-      success: true,
-      webmPath: '/tmp/recordings/rec-test-123/recording.webm',
-    }),
-    convert: vi.fn().mockResolvedValue({
-      success: true,
-      videoPath: '/tmp/recordings/rec-test-123/recording.mp4',
-      eventsPath: '/tmp/recordings/rec-test-123/recording.events.json',
-    }),
+    pause: vi.fn().mockResolvedValue({ success: true }),
+    resume: vi.fn().mockResolvedValue({ success: true }),
     relayDomEvent: vi.fn(),
     getWebviewPreloadPath: vi.fn().mockResolvedValue('/path/to/webview-preload.js'),
   }
 
-  ;(window as Record<string, unknown>)['leonardo'] = {
-    recording: { ...defaultRecording, ...overrides },
+  ;(window as Record<string, unknown>).leonardo = {
+    recording,
+    clip: {
+      create: vi.fn().mockResolvedValue({}),
+      list: vi.fn().mockResolvedValue([]),
+      delete: vi.fn().mockResolvedValue(true),
+      export: vi.fn().mockResolvedValue({ success: true }),
+      getEvents: vi.fn().mockResolvedValue([]),
+      getThumbnails: vi.fn().mockResolvedValue([]),
+    },
   }
 
-  return { mockStream, recording: (window as Record<string, unknown>)['leonardo'] as { recording: typeof defaultRecording } }
+  return recording
 }
 
-describe('RecordingControls — screen capture (unit)', () => {
+describe('RecordingControls — new IPC recording flow (unit)', () => {
+  let recording: RecordingBridge
+
   beforeEach(() => {
     vi.useFakeTimers()
 
-    setupWindowMock()
+    recording = setupWindowMock()
 
     useRecordingStore.setState({
       status: 'idle',
@@ -111,16 +72,23 @@ describe('RecordingControls — screen capture (unit)', () => {
       clips: [],
       highlightedClipId: null,
     })
+
+    useProjectStore.setState({
+      activeProjectId: null,
+      projects: [],
+      loading: false,
+    })
   })
 
   afterEach(() => {
     vi.useRealTimers()
     vi.clearAllMocks()
-    vi.unstubAllGlobals()
   })
 
-  it('calls getDisplayMedia when Record is clicked', async () => {
-    const webviewRef = makeWebviewRefWithId()
+  // --- start ---
+
+  it('calls window.leonardo.recording.start with webviewId when Record is clicked', async () => {
+    const webviewRef = makeWebviewRef(42)
     useRecordingStore.setState({ status: 'idle' })
     render(<RecordingControls webviewRef={webviewRef} />)
 
@@ -129,171 +97,194 @@ describe('RecordingControls — screen capture (unit)', () => {
       fireEvent.click(recordBtn)
     })
 
-    expect(navigator.mediaDevices.getDisplayMedia).toHaveBeenCalled()
-  })
-
-  it('calls recording.start() when Record is clicked', async () => {
-    const webviewRef = makeWebviewRefWithId()
-    useRecordingStore.setState({ status: 'idle' })
-    render(<RecordingControls webviewRef={webviewRef} />)
-
-    const recordBtn = screen.getByText('Record')
-    await act(async () => {
-      fireEvent.click(recordBtn)
-    })
-
-    expect(window.leonardo.recording.start).toHaveBeenCalled()
-  })
-
-  async function startRecording(webviewRef: React.RefObject<Electron.WebviewTag | null>) {
-    const recordBtn = screen.getByText('Record')
-    await act(async () => {
-      fireEvent.click(recordBtn)
-    })
-    // Advance past the MediaRecorder timeslice (1000ms) so a data chunk is captured
-    await act(async () => {
-      vi.advanceTimersByTime(1100)
-    })
-  }
-
-  it('calls saveBlob and convert when Stop is clicked after recording', async () => {
-    const webviewRef = makeWebviewRefWithId()
-    useRecordingStore.setState({ status: 'idle' })
-    render(<RecordingControls webviewRef={webviewRef} />)
-
-    await startRecording(webviewRef)
-
-    const stopBtn = screen.getByText('Stop')
-    await act(async () => {
-      fireEvent.click(stopBtn)
-    })
-
-    expect(window.leonardo.recording.stop).toHaveBeenCalled()
-    expect(window.leonardo.recording.saveBlob).toHaveBeenCalledWith(
-      expect.objectContaining({ outputDir: '/tmp/recordings/rec-test-123' }),
-    )
-    expect(window.leonardo.recording.convert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        recordingId: 'rec-test-123',
-        webmPath: '/tmp/recordings/rec-test-123/recording.webm',
-        outputDir: '/tmp/recordings/rec-test-123',
-      }),
+    expect(recording.start).toHaveBeenCalledWith(
+      expect.objectContaining({ webviewId: 42 }),
     )
   })
 
-  it('creates a clip with videoPath from convert result', async () => {
-    const webviewRef = makeWebviewRefWithId()
+  it('passes activeProjectId to recording.start when a project is active', async () => {
+    useProjectStore.setState({ activeProjectId: 'proj-abc', projects: [], loading: false })
+    const webviewRef = makeWebviewRef(7)
     useRecordingStore.setState({ status: 'idle' })
     render(<RecordingControls webviewRef={webviewRef} />)
 
-    await startRecording(webviewRef)
-
-    const stopBtn = screen.getByText('Stop')
     await act(async () => {
-      fireEvent.click(stopBtn)
+      fireEvent.click(screen.getByText('Record'))
     })
+
+    expect(recording.start).toHaveBeenCalledWith(
+      expect.objectContaining({ webviewId: 7, projectId: 'proj-abc' }),
+    )
+  })
+
+  it('does NOT call start and stays idle when webviewRef.current is null', async () => {
+    const nullRef = { current: null } as React.RefObject<Electron.WebviewTag | null>
+    useRecordingStore.setState({ status: 'idle' })
+    render(<RecordingControls webviewRef={nullRef} />)
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Record'))
+    })
+
+    expect(recording.start).not.toHaveBeenCalled()
+    expect(useRecordingStore.getState().status).toBe('idle')
+  })
+
+  it('sets status to recording after clicking Record (with valid webview)', async () => {
+    const webviewRef = makeWebviewRef()
+    useRecordingStore.setState({ status: 'idle' })
+    render(<RecordingControls webviewRef={webviewRef} />)
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Record'))
+    })
+
+    // Timer is ticking — status should be recording
+    expect(useRecordingStore.getState().status).toBe('recording')
+  })
+
+  // --- stop ---
+
+  it('calls window.leonardo.recording.stop when Stop is clicked', async () => {
+    const webviewRef = makeWebviewRef()
+    useRecordingStore.setState({ status: 'idle' })
+    render(<RecordingControls webviewRef={webviewRef} />)
+
+    // Start recording
+    await act(async () => { fireEvent.click(screen.getByText('Record')) })
+
+    // Stop recording
+    await act(async () => { fireEvent.click(screen.getByText('Stop')) })
+
+    expect(recording.stop).toHaveBeenCalled()
+  })
+
+  it('creates a clip with videoPath and recordingId from stop result', async () => {
+    const webviewRef = makeWebviewRef()
+    useRecordingStore.setState({ status: 'idle' })
+    render(<RecordingControls webviewRef={webviewRef} />)
+
+    await act(async () => { fireEvent.click(screen.getByText('Record')) })
+    await act(async () => { fireEvent.click(screen.getByText('Stop')) })
 
     const clips = useLibraryStore.getState().clips
     expect(clips).toHaveLength(1)
-    expect(clips[0].filePath).toBe('/tmp/recordings/rec-test-123/recording.mp4')
-    expect(clips[0].id).toBe('rec-test-123')
+    expect(clips[0].id).toBe('rec-123')
+    expect(clips[0].filePath).toBe('/tmp/rec-123/recording.mp4')
   })
 
-  it('shows "Clip added to library." after successful stop', async () => {
-    const webviewRef = makeWebviewRefWithId()
+  it('uses duration from stop result for the clip', async () => {
+    const webviewRef = makeWebviewRef()
     useRecordingStore.setState({ status: 'idle' })
     render(<RecordingControls webviewRef={webviewRef} />)
 
-    await startRecording(webviewRef)
+    await act(async () => { fireEvent.click(screen.getByText('Record')) })
+    await act(async () => { fireEvent.click(screen.getByText('Stop')) })
 
-    const stopBtn = screen.getByText('Stop')
-    await act(async () => {
-      fireEvent.click(stopBtn)
-    })
+    const clips = useLibraryStore.getState().clips
+    expect(clips[0].duration).toBe(5000)
+  })
+
+  it('shows "Clip added to library." after successful stop', async () => {
+    const webviewRef = makeWebviewRef()
+    useRecordingStore.setState({ status: 'idle' })
+    render(<RecordingControls webviewRef={webviewRef} />)
+
+    await act(async () => { fireEvent.click(screen.getByText('Record')) })
+    await act(async () => { fireEvent.click(screen.getByText('Stop')) })
 
     expect(screen.getByText('Clip added to library.')).toBeDefined()
   })
 
-  it('does not create clip when saveBlob fails', async () => {
-    ;(window.leonardo.recording.saveBlob as ReturnType<typeof vi.fn>).mockResolvedValue({
-      success: false,
-      error: 'disk full',
-      webmPath: '',
-    })
-
-    const webviewRef = makeWebviewRefWithId()
+  it('returns to idle status after successful stop', async () => {
+    const webviewRef = makeWebviewRef()
     useRecordingStore.setState({ status: 'idle' })
     render(<RecordingControls webviewRef={webviewRef} />)
 
-    await startRecording(webviewRef)
+    await act(async () => { fireEvent.click(screen.getByText('Record')) })
+    await act(async () => { fireEvent.click(screen.getByText('Stop')) })
 
-    const stopBtn = screen.getByText('Stop')
-    await act(async () => {
-      fireEvent.click(stopBtn)
-    })
-
-    expect(window.leonardo.recording.convert).not.toHaveBeenCalled()
-    expect(useLibraryStore.getState().clips).toHaveLength(0)
+    expect(useRecordingStore.getState().status).toBe('idle')
   })
 
-  it('does not create clip when convert returns success=false', async () => {
-    ;(window.leonardo.recording.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
-      success: false,
-      error: 'ffmpeg failed',
-    })
+  // --- stop failure ---
 
-    const webviewRef = makeWebviewRefWithId()
-    useRecordingStore.setState({ status: 'idle' })
-    render(<RecordingControls webviewRef={webviewRef} />)
-
-    await startRecording(webviewRef)
-
-    const stopBtn = screen.getByText('Stop')
-    await act(async () => {
-      fireEvent.click(stopBtn)
-    })
-
-    expect(useLibraryStore.getState().clips).toHaveLength(0)
-  })
-
-  it('continues recording without video when getDisplayMedia is denied', async () => {
-    ;(navigator.mediaDevices.getDisplayMedia as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error('Permission denied'),
-    )
-
-    const webviewRef = makeWebviewRefWithId()
-    useRecordingStore.setState({ status: 'idle' })
-    render(<RecordingControls webviewRef={webviewRef} />)
-
-    const recordBtn = screen.getByText('Record')
-    // Should not throw
-    await act(async () => {
-      fireEvent.click(recordBtn)
-    })
-
-    // Should still be in recording state
-    expect(useRecordingStore.getState().status).toBe('recording')
-  })
-
-  it('does not call saveBlob when blob is empty after denied capture', async () => {
-    // Deny screen share so no MediaRecorder is created — blob will be empty
-    ;(navigator.mediaDevices.getDisplayMedia as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error('Permission denied'),
-    )
+  it('does not create a clip when stop returns success: false', async () => {
+    recording.stop.mockResolvedValue({ success: false, error: 'recording failed' })
 
     const webviewRef = makeWebviewRef()
-    // Start in recording state (as if user already clicked Record and it transitioned)
-    useRecordingStore.setState({ status: 'recording' })
+    useRecordingStore.setState({ status: 'idle' })
     render(<RecordingControls webviewRef={webviewRef} />)
 
-    const stopBtn = screen.getByText('Stop')
-    await act(async () => {
-      fireEvent.click(stopBtn)
+    await act(async () => { fireEvent.click(screen.getByText('Record')) })
+    await act(async () => { fireEvent.click(screen.getByText('Stop')) })
+
+    expect(useLibraryStore.getState().clips).toHaveLength(0)
+  })
+
+  it('does not create a clip when stop result has no videoPath', async () => {
+    recording.stop.mockResolvedValue({
+      success: true,
+      recordingId: 'rec-123',
+      videoPath: undefined,
     })
 
-    // saveBlob should NOT be called because blob.size === 0
-    expect(window.leonardo.recording.saveBlob).not.toHaveBeenCalled()
-    // Status should end up idle (via finally block)
+    const webviewRef = makeWebviewRef()
+    useRecordingStore.setState({ status: 'idle' })
+    render(<RecordingControls webviewRef={webviewRef} />)
+
+    await act(async () => { fireEvent.click(screen.getByText('Record')) })
+    await act(async () => { fireEvent.click(screen.getByText('Stop')) })
+
+    expect(useLibraryStore.getState().clips).toHaveLength(0)
+  })
+
+  it('does not create a clip when stop result has no recordingId', async () => {
+    recording.stop.mockResolvedValue({
+      success: true,
+      recordingId: undefined,
+      videoPath: '/tmp/rec-123/recording.mp4',
+    })
+
+    const webviewRef = makeWebviewRef()
+    useRecordingStore.setState({ status: 'idle' })
+    render(<RecordingControls webviewRef={webviewRef} />)
+
+    await act(async () => { fireEvent.click(screen.getByText('Record')) })
+    await act(async () => { fireEvent.click(screen.getByText('Stop')) })
+
+    expect(useLibraryStore.getState().clips).toHaveLength(0)
+  })
+
+  it('still returns to idle status even when stop returns success: false', async () => {
+    recording.stop.mockResolvedValue({ success: false, error: 'crash' })
+
+    const webviewRef = makeWebviewRef()
+    useRecordingStore.setState({ status: 'idle' })
+    render(<RecordingControls webviewRef={webviewRef} />)
+
+    await act(async () => { fireEvent.click(screen.getByText('Record')) })
+    await act(async () => { fireEvent.click(screen.getByText('Stop')) })
+
     expect(useRecordingStore.getState().status).toBe('idle')
+  })
+
+  // --- no MediaRecorder / getDisplayMedia ---
+
+  it('does not touch navigator.mediaDevices at all', async () => {
+    const getSpy = vi.fn()
+    Object.defineProperty(window.navigator, 'mediaDevices', {
+      value: { getDisplayMedia: getSpy },
+      configurable: true,
+    })
+
+    const webviewRef = makeWebviewRef()
+    useRecordingStore.setState({ status: 'idle' })
+    render(<RecordingControls webviewRef={webviewRef} />)
+
+    await act(async () => { fireEvent.click(screen.getByText('Record')) })
+    await act(async () => { fireEvent.click(screen.getByText('Stop')) })
+
+    expect(getSpy).not.toHaveBeenCalled()
   })
 })

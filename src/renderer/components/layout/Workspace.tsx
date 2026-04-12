@@ -4,11 +4,13 @@ import { useProjectStore } from '../../stores/project-store'
 import { useScriptStore } from '../../stores/script-store'
 import { useTimelineStore } from '../../stores/timeline-store'
 import { useComposeStore } from '../../stores/compose-store'
+import { useUndoRedo } from '../../hooks/useUndoRedo'
 import { Toolbar } from './Toolbar'
 import { PanelSystem } from './PanelSystem'
 import { ProjectHome } from '../project/ProjectHome'
 
 export function Workspace(): React.ReactNode {
+  useUndoRedo() // Global shortcuts: Space play/pause, Cmd+Z undo/redo
   const workspacePreset = useUIStore((s) => s.workspacePreset)
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
   const loadProjectScripts = useScriptStore((s) => s.loadProjectScripts)

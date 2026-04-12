@@ -17,7 +17,7 @@ import {
   createProject,
   getDatabase,
 } from '@main/services/project-store'
-import { exportArchive, importArchive } from '@main/services/archive'
+import { exportArchive, importArchive, resolveArchiveEntryPath } from '@main/services/archive'
 
 describe('archive service (real SQLite + real zip)', () => {
   let tempDir: string
@@ -109,6 +109,12 @@ describe('archive service (real SQLite + real zip)', () => {
     const importDir = join(tempDir, 'empty-import')
     expect(() => importArchive('/tmp/does-not-exist.leonardo', importDir)).toThrow(
       'Archive not found',
+    )
+  })
+
+  it('rejects archive entry path traversal', () => {
+    expect(() => resolveArchiveEntryPath(join(tempDir, 'evil-import'), '../../escape.txt')).toThrow(
+      'Archive contains invalid entry path',
     )
   })
 

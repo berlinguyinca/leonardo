@@ -122,6 +122,9 @@ Phases 1-6 are complete with 218 tests passing:
 git clone <repo-url> leonardo
 cd leonardo
 npm install
+
+# Rebuild native modules for Electron (required after npm install)
+npx @electron/rebuild -f -w better-sqlite3
 ```
 
 ### Development
@@ -243,6 +246,25 @@ npx vitest run tests/unit/timeline-utils.test.ts
 # Run tests matching a pattern
 npx vitest run --reporter=verbose timeline
 ```
+
+## Troubleshooting
+
+### `NODE_MODULE_VERSION` mismatch
+
+If you see an error like:
+
+```
+was compiled against a different Node.js version using NODE_MODULE_VERSION X.
+This version of Node.js requires NODE_MODULE_VERSION Y.
+```
+
+This means `better-sqlite3` was compiled for your system Node.js but Electron uses a different ABI. Fix it by rebuilding:
+
+```bash
+npx @electron/rebuild -f -w better-sqlite3
+```
+
+This must be re-run after switching Node.js versions or running a fresh `npm install`.
 
 ## Architecture
 

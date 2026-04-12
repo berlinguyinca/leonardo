@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import type { Clip } from '@shared/types/events'
+import { useTimelineStore } from './timeline-store'
+import { useScriptStore } from './script-store'
 
 interface LibraryState {
   clips: Clip[]
@@ -15,7 +17,7 @@ function hasBridge(): boolean {
   return typeof window !== 'undefined' && !!window.leonardo?.clip
 }
 
-export const useLibraryStore = create<LibraryState>((set) => ({
+export const useLibraryStore = create<LibraryState>((set, get) => ({
   clips: [],
   highlightedClipId: null,
 
@@ -33,6 +35,11 @@ export const useLibraryStore = create<LibraryState>((set) => ({
   },
 
   removeClip: async (id) => {
+    const clip = get().clips.find((c) => c.id === id)
+    if (clip) {
+      useTimelineStore.getState().removeSegmentsBySourceFile(clip.filePath)
+      useScriptStore.getState().removeClipScript(clip.id)
+    }
     if (hasBridge()) {
       await window.leonardo.clip.delete(id)
     }

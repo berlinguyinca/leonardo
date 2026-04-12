@@ -1,9 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+const mockWebContents = {
+  on: vi.fn(),
+  off: vi.fn(),
+  executeJavaScript: vi.fn().mockResolvedValue(undefined),
+}
+
 // Mock electron
 vi.mock('electron', () => ({
   webContents: {
-    fromId: () => null,
+    fromId: () => mockWebContents,
   },
 }))
 
@@ -24,6 +30,9 @@ describe('dom-capture', () => {
   beforeEach(() => {
     // Reset state by stopping any captures
     stopCapture(999)
+    mockWebContents.on.mockClear()
+    mockWebContents.off.mockClear()
+    mockWebContents.executeJavaScript.mockClear()
   })
 
   describe('isLeonardoEvent', () => {
@@ -53,6 +62,15 @@ describe('dom-capture', () => {
       startCapture(100)
       expect(getCapturedEvents(100)).toEqual([])
       stopCapture(100)
+    })
+
+    it('removes the did-finish-load listener when capture stops', () => {
+      startCapture(700)
+      expect(mockWebContents.on).toHaveBeenCalledWith('did-finish-load', expect.any(Function))
+
+      stopCapture(700)
+
+      expect(mockWebContents.off).toHaveBeenCalledWith('did-finish-load', expect.any(Function))
     })
 
     it('collects DOM events during capture', () => {

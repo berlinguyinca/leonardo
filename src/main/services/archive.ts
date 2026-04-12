@@ -1,6 +1,6 @@
 import AdmZip from 'adm-zip'
-import { existsSync, mkdirSync } from 'fs'
-import { join } from 'path'
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
+import { join, resolve, sep } from 'path'
 import Database from 'better-sqlite3'
 import {
   LEONARDO_ARCHIVE_DB_NAME,
@@ -99,7 +99,6 @@ export function exportArchive(options: ArchiveExportOptions): string {
 
   // Clean up temp DB
   try {
-    const { unlinkSync } = require('fs')
     unlinkSync(tempDbPath)
   } catch {
     // best effort cleanup
@@ -122,19 +121,44 @@ export function importArchive(archivePath: string, extractDir: string): ArchiveI
   mkdirSync(mediaDir, { recursive: true })
   mkdirSync(thumbnailsDir, { recursive: true })
 
-  // Extract all entries
-  zip.extractAllTo(extractDir, true)
+  extractArchiveSafely(zip, extractDir)
 
   const dbPath = join(extractDir, LEONARDO_ARCHIVE_DB_NAME)
   const settingsPath = join(extractDir, LEONARDO_ARCHIVE_SETTINGS_FILE)
 
   let settings: Record<string, unknown> = {}
   if (existsSync(settingsPath)) {
-    const { readFileSync } = require('fs')
     settings = JSON.parse(readFileSync(settingsPath, 'utf-8'))
   }
 
   return { dbPath, mediaDir, thumbnailsDir, settings }
+}
+
+function extractArchiveSafely(zip: AdmZip, extractDir: string): void {
+  for (const entry of zip.getEntries()) {
+    const destinationPath = resolveArchiveEntryPath(extractDir, entry.entryName)
+
+    if (entry.isDirectory) {
+      mkdirSync(destinationPath, { recursive: true })
+      continue
+    }
+
+    mkdirSync(resolve(destinationPath, '..'), { recursive: true })
+    writeFileSync(destinationPath, entry.getData())
+  }
+}
+
+export function resolveArchiveEntryPath(extractDir: string, entryName: string): string {
+  const rootDir = ensureTrailingSeparator(resolve(extractDir))
+  const destinationPath = resolve(extractDir, entryName)
+  if (!destinationPath.startsWith(rootDir)) {
+    throw new Error(`Archive contains invalid entry path: ${entryName}`)
+  }
+  return destinationPath
+}
+
+function ensureTrailingSeparator(path: string): string {
+  return path.endsWith(sep) ? path : path + sep
 }
 
 function copyTableRows(

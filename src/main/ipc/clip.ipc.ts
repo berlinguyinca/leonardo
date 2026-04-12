@@ -5,21 +5,37 @@ import { IPC_CHANNELS } from '@shared/constants'
 import type { Clip } from '@shared/types/events'
 import * as projectStore from '../services/project-store'
 import { extractThumbnails } from '../utils/ffmpeg'
+import { assertTrustedIPCEvent } from './security'
 
 export function registerClipIPC(): void {
-  ipcMain.handle(IPC_CHANNELS.CLIP_CREATE, async (_event, clip: Clip) =>
-    projectStore.createClip(clip),
-  )
+  ipcMain.handle(IPC_CHANNELS.CLIP_CREATE, async (event, clip: Clip) => {
+    assertTrustedIPCEvent(event)
+    return projectStore.createClip(clip)
+  })
 
-  ipcMain.handle(IPC_CHANNELS.CLIP_LIST, async (_event, projectId?: string) =>
-    projectStore.listClips(projectId),
-  )
+  ipcMain.handle(IPC_CHANNELS.CLIP_LIST, async (event, projectId?: string) => {
+    assertTrustedIPCEvent(event)
+    return projectStore.listClips(projectId)
+  })
 
-  ipcMain.handle(IPC_CHANNELS.CLIP_DELETE, async (_event, id: string) =>
-    projectStore.deleteClip(id),
-  )
+  ipcMain.handle(IPC_CHANNELS.CLIP_DELETE, async (event, id: string) => {
+    assertTrustedIPCEvent(event)
+    const clips = projectStore.listClips()
+    const clip = clips.find((c) => c.id === id)
+    if (clip) {
+      // Delete associated scripts and their sections
+      const db = projectStore.getDatabase()
+      db.prepare('DELETE FROM script_sections WHERE script_id IN (SELECT id FROM scripts WHERE clip_id = ?)').run(id)
+      db.prepare('DELETE FROM scripts WHERE clip_id = ?').run(id)
+      // Delete recording directory (video, events, thumbnails)
+      const dir = path.dirname(clip.filePath)
+      await fs.promises.rm(dir, { recursive: true, force: true }).catch(() => {})
+    }
+    return projectStore.deleteClip(id)
+  })
 
-  ipcMain.handle(IPC_CHANNELS.CLIP_EXPORT, async (_event, id: string) => {
+  ipcMain.handle(IPC_CHANNELS.CLIP_EXPORT, async (event, id: string) => {
+    assertTrustedIPCEvent(event)
     try {
       const clips = await projectStore.listClips()
       const clip = clips.find((c) => c.id === id)
@@ -39,7 +55,8 @@ export function registerClipIPC(): void {
     }
   })
 
-  ipcMain.handle(IPC_CHANNELS.CLIP_GET_EVENTS, async (_event, clipId: string) => {
+  ipcMain.handle(IPC_CHANNELS.CLIP_GET_EVENTS, async (event, clipId: string) => {
+    assertTrustedIPCEvent(event)
     const clips = await projectStore.listClips()
     const clip = clips.find((c) => c.id === clipId)
     if (!clip) return []
@@ -53,7 +70,8 @@ export function registerClipIPC(): void {
     }
   })
 
-  ipcMain.handle(IPC_CHANNELS.CLIP_GET_THUMBNAILS, async (_event, clipId: string, count: number) => {
+  ipcMain.handle(IPC_CHANNELS.CLIP_GET_THUMBNAILS, async (event, clipId: string, count: number) => {
+    assertTrustedIPCEvent(event)
     const clips = await projectStore.listClips()
     const clip = clips.find((c) => c.id === clipId)
     if (!clip) return []

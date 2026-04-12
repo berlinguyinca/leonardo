@@ -83,10 +83,11 @@ describe('Timeline: delete key removes selected segment', () => {
 
   it('Delete key removes the selected segment and clears selection', () => {
     useTimelineStore.setState({ selectedSegmentId: 'seg-1' })
-    render(<Timeline />)
+    const { container } = render(<Timeline />)
+    const timelineEl = container.querySelector('.timeline-container') as HTMLElement
 
     act(() => {
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }))
+      timelineEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }))
     })
 
     const state = useTimelineStore.getState()
@@ -96,10 +97,11 @@ describe('Timeline: delete key removes selected segment', () => {
 
   it('Backspace key removes the selected segment and clears selection', () => {
     useTimelineStore.setState({ selectedSegmentId: 'seg-1' })
-    render(<Timeline />)
+    const { container } = render(<Timeline />)
+    const timelineEl = container.querySelector('.timeline-container') as HTMLElement
 
     act(() => {
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true }))
+      timelineEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true }))
     })
 
     const state = useTimelineStore.getState()

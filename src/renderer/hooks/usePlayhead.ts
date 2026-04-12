@@ -31,6 +31,17 @@ export function usePlayhead() {
   useEffect(() => {
     if (!isPlaying) return
 
+    // Sync positionRef with store (keyboard/external seeks may have changed it)
+    positionRef.current = useTimelineStore.getState().playheadPosition
+
+    // Reset to beginning if playhead is at or past the end of the timeline
+    const currentDuration = useTimelineStore.getState().timeline?.duration ?? 0
+    if (currentDuration > 0 && positionRef.current >= currentDuration) {
+      positionRef.current = 0
+      setVisualPosition(0)
+      setPlayheadPosition(0)
+    }
+
     let lastTime = performance.now()
 
     const tick = (now: number) => {

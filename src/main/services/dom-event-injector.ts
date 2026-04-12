@@ -46,7 +46,24 @@ export function getDOMEventInjectionScript(): string {
         return text.length > 100 ? text.substring(0, 100) + '...' : text;
       }
 
+      function getElementMeta(el) {
+        if (!el || !el.tagName) return {};
+        return {
+          tagName: el.tagName.toLowerCase(),
+          alt: el.getAttribute('alt') || '',
+          title: el.getAttribute('title') || '',
+          ariaLabel: el.getAttribute('aria-label') || '',
+          ariaDescribedby: el.getAttribute('aria-describedby') || '',
+          href: el.getAttribute('href') || '',
+          elementType: el.getAttribute('type') || '',
+          role: el.getAttribute('role') || '',
+          name: el.getAttribute('name') || '',
+          placeholder: el.getAttribute('placeholder') || '',
+        };
+      }
+
       function emit(type, detail) {
+        var meta = detail.meta || {};
         window.postMessage({
           __leonardoEvent: true,
           type: type,
@@ -56,6 +73,16 @@ export function getDOMEventInjectionScript(): string {
           elementText: detail.text || '',
           url: detail.url || '',
           value: detail.value || '',
+          tagName: meta.tagName || '',
+          alt: meta.alt || '',
+          title: meta.title || '',
+          ariaLabel: meta.ariaLabel || '',
+          ariaDescribedby: meta.ariaDescribedby || '',
+          href: meta.href || '',
+          elementType: meta.elementType || '',
+          role: meta.role || '',
+          name: meta.name || '',
+          placeholder: meta.placeholder || '',
         }, '*');
       }
 
@@ -65,6 +92,7 @@ export function getDOMEventInjectionScript(): string {
           selector: getSelector(e.target),
           coordinates: { x: e.clientX, y: e.clientY },
           text: getElementText(e.target),
+          meta: getElementMeta(e.target),
         });
       }, true);
 
@@ -74,6 +102,7 @@ export function getDOMEventInjectionScript(): string {
           selector: getSelector(e.target),
           coordinates: { x: 0, y: 0 },
           text: getElementText(e.target),
+          meta: getElementMeta(e.target),
         });
       }, true);
 
@@ -86,6 +115,7 @@ export function getDOMEventInjectionScript(): string {
             selector: getSelector(e.target),
             coordinates: { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 },
             text: e.target.placeholder || e.target.name || '',
+            meta: getElementMeta(e.target),
           });
         }
       }, true);
@@ -98,6 +128,7 @@ export function getDOMEventInjectionScript(): string {
             selector: getSelector(e.target),
             coordinates: { x: 0, y: 0 },
             value: e.target.value ? '[' + e.target.value.length + ' chars]' : '',
+            meta: getElementMeta(e.target),
           });
         }
       }, true);
