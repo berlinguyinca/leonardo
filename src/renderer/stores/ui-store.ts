@@ -1,8 +1,8 @@
 import { create } from 'zustand'
 
 export type Theme = 'dark' | 'light'
-export type WorkspacePreset = 'recording' | 'editing' | 'export'
-export type EditorView = 'script-only' | 'dual-pane' | 'inline'
+export type WorkspacePreset = 'recording' | 'compose' | 'script' | 'export'
+export type EditorView = 'script-only' | 'inline'
 
 interface PanelSnapshot {
   sidebarCollapsed: boolean
@@ -39,8 +39,8 @@ interface UIState {
 
 export const useUIStore = create<UIState>((set) => ({
   theme: 'dark',
-  workspacePreset: 'editing',
-  editorView: 'dual-pane',
+  workspacePreset: 'compose',
+  editorView: 'inline',
   showProjectWizard: false,
   showLogViewer: false,
   sidebarWidth: 260,

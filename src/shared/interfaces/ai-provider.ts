@@ -7,6 +7,7 @@ export interface IAIProvider {
   readonly isAvailable: boolean
 
   generateScript(prompt: string, context: ScriptGenContext): Promise<Script>
+  generateScriptStream?(prompt: string, context: ScriptGenContext, onChunk: (chunk: string) => void): Promise<Script>
   refineSyncPoints(script: Script, domEvents: DOMEvent[]): Promise<SyncPoint[]>
   testConnection(): Promise<boolean>
 }

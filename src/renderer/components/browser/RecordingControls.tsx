@@ -41,9 +41,6 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
   const [pausedDuration, setPausedDuration] = useState(0)
   const [pendingClip, setPendingClip] = useState<Clip | null>(null)
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-
   const startTimer = useCallback(() => {
     startTimeRef.current = Date.now() - pausedDuration
     timerRef.current = setInterval(() => {
@@ -58,29 +55,9 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
     }
   }, [])
 
-  const stopMediaRecorder = useCallback((): Promise<Blob> => {
-    return new Promise((resolve) => {
-      const recorder = mediaRecorderRef.current
-      if (!recorder || recorder.state === 'inactive') {
-        resolve(new Blob([], { type: 'video/webm' }))
-        return
-      }
-      recorder.onstop = () => {
-        recorder.stream.getTracks().forEach((t) => t.stop())
-        resolve(new Blob(chunksRef.current, { type: 'video/webm' }))
-      }
-      mediaRecorderRef.current = null
-      recorder.stop()
-    })
-  }, [])
-
   useEffect(() => {
-    return () => {
-      stopTimer()
-      // Stop media recorder if component unmounts during recording
-      void stopMediaRecorder()
-    }
-  }, [stopTimer, stopMediaRecorder])
+    return () => { stopTimer() }
+  }, [stopTimer])
 
   useEffect(() => {
     if (!pendingClip) return
@@ -103,38 +80,19 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
       stopTimer()
       return
     }
-    await window.leonardo.recording.start({ webviewId: webContentsId })
-
-    // Start screen capture via MediaRecorder
-    try {
-      chunksRef.current = []
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: 30 } as MediaTrackConstraints,
-      })
-      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' })
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data)
-      }
-      recorder.start(1000) // collect a chunk every second
-      mediaRecorderRef.current = recorder
-    } catch (err) {
-      // If screen capture fails (e.g. user denied), continue recording without video
-      console.warn('[RecordingControls] Screen capture failed:', err)
-    }
-  }, [status, setStatus, setRecordingDuration, startTimer, stopTimer, collapseAllPanels, restorePanelState, webviewRef])
+    await window.leonardo.recording.start({ webviewId: webContentsId, projectId: activeProjectId ?? undefined })
+  }, [status, setStatus, setRecordingDuration, startTimer, stopTimer, collapseAllPanels, restorePanelState, webviewRef, activeProjectId])
 
   const handlePause = useCallback(() => {
     setStatus('paused')
     stopTimer()
     setPausedDuration(recordingDuration)
-
     window.leonardo.recording.pause()
   }, [setStatus, stopTimer, recordingDuration])
 
   const handleResume = useCallback(() => {
     setStatus('recording')
     startTimer()
-
     window.leonardo.recording.resume()
   }, [setStatus, startTimer])
 
@@ -142,59 +100,29 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
     stopTimer()
     setStatus('processing')
     try {
-      // Stop both the recorder and the IPC session in parallel
-      const [blob, result] = await Promise.all([
-        stopMediaRecorder(),
-        window.leonardo.recording.stop(),
-      ])
+      const result = await window.leonardo.recording.stop()
+      if (!result.success || !result.recordingId || !result.videoPath) return
 
-      if (!result.success || !result.recordingId || !result.outputDir) return
-
-      // Skip video pipeline if no video was captured (e.g. screen share denied)
-      if (blob.size === 0) return
-
-      // Save the WebM blob to disk
-      const buffer = await blob.arrayBuffer()
-      const saveResult = await window.leonardo.recording.saveBlob({
-        outputDir: result.outputDir,
-        buffer,
-      })
-
-      if (!saveResult.success) {
-        console.warn('[RecordingControls] Failed to save blob:', saveResult.error)
-        return
-      }
-
-      // Convert WebM → MP4 and persist .events.json
-      const convertResult = await window.leonardo.recording.convert({
-        recordingId: result.recordingId,
-        webmPath: saveResult.webmPath,
-        outputDir: result.outputDir,
+      const currentClipCount = useLibraryStore.getState().clips.length
+      const clip: Clip = {
+        id: result.recordingId,
         projectId: activeProjectId ?? '',
-      })
-
-      if (convertResult.success && convertResult.videoPath) {
-        const currentClipCount = useLibraryStore.getState().clips.length
-        const clip: Clip = {
-          id: result.recordingId,
-          projectId: activeProjectId ?? '',
-          filePath: convertResult.videoPath,
-          duration: result.duration ?? recordingDuration,
-          url: currentUrl,
-          resolution: { width: targetResolution.width, height: targetResolution.height },
-          createdAt: new Date().toISOString(),
-          label: `Recording ${currentClipCount + 1}`,
-        }
-        await addClip(clip)
-        setHighlightedClip(clip.id)
-        setPendingClip(clip)
+        filePath: result.videoPath,
+        duration: result.duration ?? recordingDuration,
+        url: currentUrl,
+        resolution: { width: targetResolution.width, height: targetResolution.height },
+        createdAt: new Date().toISOString(),
+        label: `Recording ${currentClipCount + 1}`,
       }
+      await addClip(clip)
+      setHighlightedClip(clip.id)
+      setPendingClip(clip)
     } finally {
       restorePanelState()
       setStatus('idle')
     }
   }, [
-    stopTimer, setStatus, stopMediaRecorder, activeProjectId, recordingDuration,
+    stopTimer, setStatus, activeProjectId, recordingDuration,
     currentUrl, targetResolution, addClip, setHighlightedClip, restorePanelState,
   ])
 
@@ -247,7 +175,7 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
           <button
             onClick={() => {
               addClipToTimeline(pendingClip)
-              setWorkspacePreset('editing')
+              setWorkspacePreset('compose')
               setEditorView('inline')
               setTimelineCollapsed(false)
               setPendingClip(null)

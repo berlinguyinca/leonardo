@@ -13,6 +13,14 @@ Output format:
   [ZOOM .selector] — zoom into the specified CSS selector
   [FREEZE 2.0] — freeze the frame for 2.0 seconds
   [TRANSITION fade] — add a fade transition before this section
+  [ACTION: eventId "description"] — link narration to a specific DOM event by its ID, with a human-readable description of the action
+
+ACTION marker usage:
+- Use [ACTION: <eventId> "<description>"] to connect script sections to recorded DOM events
+- The eventId should reference an event from the interaction timeline below
+- The description should be a concise label for what the user did, e.g. "Click submit button"
+- Example: [ACTION: evt-001 "Click the login button"]
+- Multiple ACTION markers can appear in a single section
 
 Guidelines:
 - Use a professional but approachable tone
@@ -42,6 +50,24 @@ export function getSystemPrompt(): string {
   return SYSTEM_PROMPT
 }
 
+function describeElement(e: DOMEvent): string {
+  const parts: string[] = []
+  if (e.tagName) {
+    let tag = `<${e.tagName}`
+    if (e.elementType) tag += ` type="${e.elementType}"`
+    if (e.role) tag += ` role="${e.role}"`
+    if (e.ariaLabel) tag += ` aria-label="${e.ariaLabel}"`
+    tag += '>'
+    parts.push(tag)
+  }
+  if (e.elementText) parts.push(`"${e.elementText}"`)
+  if (e.href) parts.push(`(href: ${e.href})`)
+  if (e.alt) parts.push(`(alt: ${e.alt})`)
+  if (e.title) parts.push(`(title: ${e.title})`)
+  if (parts.length > 0) return parts.join(' ')
+  return e.elementSelector
+}
+
 function summarizeDOMEvents(events: DOMEvent[]): string {
   if (events.length === 0) return '(no DOM events captured)'
 
@@ -50,15 +76,17 @@ function summarizeDOMEvents(events: DOMEvent[]): string {
       const time = (e.timestamp / 1000).toFixed(1)
       switch (e.type) {
         case 'click':
-          return `[${time}s] Click on "${e.elementText || e.elementSelector}" at (${e.coordinates.x}, ${e.coordinates.y})`
+          return `[${time}s] Click on ${describeElement(e)} at (${e.coordinates.x}, ${e.coordinates.y})`
         case 'submit':
-          return `[${time}s] Form submitted: ${e.elementSelector}`
+          return `[${time}s] Form submitted: ${describeElement(e)}`
         case 'navigate':
           return `[${time}s] Navigate to: ${e.url}`
-        case 'focus':
-          return `[${time}s] Focus on input: ${e.elementText || e.elementSelector}`
+        case 'focus': {
+          const desc = e.placeholder ? `"${e.placeholder}"` : (e.elementText || describeElement(e))
+          return `[${time}s] Focus on input: ${desc}`
+        }
         case 'input':
-          return `[${time}s] Type in: ${e.elementSelector} ${e.value || ''}`
+          return `[${time}s] Type in: ${describeElement(e)} ${e.value || ''}`
         case 'scroll':
           return `[${time}s] Scroll to (${e.coordinates.x}, ${e.coordinates.y})`
         default:

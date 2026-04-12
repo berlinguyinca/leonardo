@@ -4,6 +4,7 @@ import type { Project, InputModeType, Resolution } from '@shared/types/project'
 import type { ArchiveImportResult } from '../main/services/archive'
 import type { Clip, DOMEvent } from '@shared/types/events'
 import type { AIBackendConfig, Script, ScriptGenContext, ScriptSection } from '@shared/types/ai'
+import type { SyncTimeline } from '@shared/types'
 
 const api = {
   project: {
@@ -38,6 +39,7 @@ const api = {
     stop: (): Promise<{
       success: boolean
       recordingId?: string
+      videoPath?: string
       outputDir?: string
       domEvents?: unknown[]
       duration?: number
@@ -45,18 +47,6 @@ const api = {
     }> => ipcRenderer.invoke(IPC_CHANNELS.RECORDING_STOP),
     pause: (): Promise<{ success: boolean }> => ipcRenderer.invoke('recording:pause'),
     resume: (): Promise<{ success: boolean }> => ipcRenderer.invoke('recording:resume'),
-    convert: (args: {
-      recordingId: string
-      webmPath: string
-      outputDir: string
-      projectId: string
-    }): Promise<{ success: boolean; videoPath?: string; eventsPath?: string; error?: string }> =>
-      ipcRenderer.invoke('recording:convert', args),
-    onProgress: (callback: (progress: { recordingId: string; stage: string; percent: number }) => void): (() => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, progress: { recordingId: string; stage: string; percent: number }) => callback(progress)
-      ipcRenderer.on(IPC_CHANNELS.RENDER_PROGRESS, handler)
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.RENDER_PROGRESS, handler)
-    },
     getStatus: (): Promise<{
       isRecording: boolean
       recordingId: string | null
@@ -66,8 +56,6 @@ const api = {
     relayDomEvent: (data: unknown): void => ipcRenderer.send('dom-event-relay', data),
     getWebviewPreloadPath: (): Promise<string> =>
       ipcRenderer.invoke('recording:get-webview-preload-path'),
-    saveBlob: (args: { outputDir: string; buffer: ArrayBuffer }): Promise<{ success: boolean; webmPath: string; error?: string }> =>
-      ipcRenderer.invoke('recording:save-blob', args),
   },
   clip: {
     create: (clip: Clip): Promise<Clip> =>
@@ -92,6 +80,28 @@ const api = {
       clipId?: string
     }): Promise<{ success: boolean; script?: Script; error?: string }> =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_SCRIPT, args),
+    generateScriptStream: (args: {
+      config: AIBackendConfig
+      prompt: string
+      context: ScriptGenContext
+      projectId: string
+      clipId?: string
+    }): Promise<{ success: boolean; script?: Script; error?: string }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_SCRIPT_STREAM, args),
+    onStreamChunk: (cb: (chunk: string) => void): void => {
+      ipcRenderer.on(IPC_CHANNELS.AI_STREAM_CHUNK, (_e, chunk) => cb(chunk))
+    },
+    onStreamDone: (cb: (script: unknown) => void): void => {
+      ipcRenderer.on(IPC_CHANNELS.AI_STREAM_DONE, (_e, script) => cb(script))
+    },
+    onStreamError: (cb: (err: unknown) => void): void => {
+      ipcRenderer.on(IPC_CHANNELS.AI_STREAM_ERROR, (_e, err) => cb(err))
+    },
+    removeStreamListeners: (): void => {
+      ipcRenderer.removeAllListeners(IPC_CHANNELS.AI_STREAM_CHUNK)
+      ipcRenderer.removeAllListeners(IPC_CHANNELS.AI_STREAM_DONE)
+      ipcRenderer.removeAllListeners(IPC_CHANNELS.AI_STREAM_ERROR)
+    },
   },
   log: {
     read: (): Promise<string> =>
@@ -102,6 +112,20 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.SCRIPT_SAVE, script, clipId),
     listByProject: (projectId: string): Promise<Array<Script & { sections: ScriptSection[] }>> =>
       ipcRenderer.invoke(IPC_CHANNELS.SCRIPT_LIST_BY_PROJECT, projectId),
+  },
+  settings: {
+    get: (key: string): Promise<string | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET, key),
+    set: (key: string, value: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET, { key, value }),
+  },
+  timeline: {
+    save: (timeline: SyncTimeline): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.TIMELINE_SAVE, timeline),
+    get: (projectId: string): Promise<SyncTimeline | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.TIMELINE_GET, projectId),
+    delete: (projectId: string): Promise<boolean> =>
+      ipcRenderer.invoke(IPC_CHANNELS.TIMELINE_DELETE, projectId),
   },
 }
 

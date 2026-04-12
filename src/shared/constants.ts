@@ -20,6 +20,10 @@ export const IPC_CHANNELS = {
   RECORDING_START: 'recording:start',
   RECORDING_STOP: 'recording:stop',
   AI_GENERATE_SCRIPT: 'ai:generate-script',
+  AI_GENERATE_SCRIPT_STREAM: 'ai:generate-script-stream',
+  AI_STREAM_CHUNK: 'ai:stream-chunk',
+  AI_STREAM_DONE: 'ai:stream-done',
+  AI_STREAM_ERROR: 'ai:stream-error',
   TTS_SYNTHESIZE: 'tts:synthesize',
   RENDER_START: 'render:start',
   RENDER_PROGRESS: 'render:progress',
@@ -37,6 +41,11 @@ export const IPC_CHANNELS = {
   LOG_READ: 'log:read',
   SCRIPT_SAVE: 'script:save',
   SCRIPT_LIST_BY_PROJECT: 'script:list-by-project',
+  SETTINGS_GET: 'settings:get',
+  SETTINGS_SET: 'settings:set',
+  TIMELINE_SAVE: 'timeline:save',
+  TIMELINE_GET: 'timeline:get',
+  TIMELINE_DELETE: 'timeline:delete',
 } as const
 
 export const TIMELINE_MIN_ZOOM = 0.1

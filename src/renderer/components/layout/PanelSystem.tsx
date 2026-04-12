@@ -3,11 +3,13 @@ import type { WorkspacePreset } from '../../stores/ui-store'
 import { useUIStore } from '../../stores/ui-store'
 import { useScriptStore } from '../../stores/script-store'
 import { RecordingBrowser } from '../browser/RecordingBrowser'
+import { PlaybackPanel } from '../preview/PlaybackPanel'
 import { PropertiesPanel } from '../properties/PropertiesPanel'
 import { ScriptOnlyView } from '../script-editor/ScriptOnlyView'
-import { DualPaneView } from '../script-editor/DualPaneView'
 import { InlineEditorView } from '../script-editor/InlineEditorView'
 import { ClipLibrary } from '../clip-library/ClipLibrary'
+import { ComposeView } from '../compose/ComposeView'
+import { ScriptPresetView } from '../script-view/ScriptPresetView'
 
 const COLLAPSED_SIZE = 36
 
@@ -102,14 +104,13 @@ export function PanelSystem({ preset }: PanelSystemProps): React.ReactNode {
         <div className="panel-top" style={{ height: `calc(100% - ${effectiveTimelineHeight}px - 4px)` }}>
           <div className="panel panel-preview">
             <div className="panel-header">
-              {preset === 'recording' ? 'Browser' : 'Preview'}
+              {preset === 'recording' ? 'Browser' : preset === 'compose' ? 'Compose' : preset === 'script' ? 'Script' : 'Preview'}
             </div>
             <div className="panel-content">
-              {preset === 'recording' ? (
-                <RecordingBrowser />
-              ) : (
-                <p className="panel-placeholder">Video Preview</p>
-              )}
+              {preset === 'recording' && <RecordingBrowser />}
+              {preset === 'compose' && <ComposeView />}
+              {preset === 'script' && <ScriptPresetView />}
+              {preset === 'export' && <PlaybackPanel />}
             </div>
           </div>
 
@@ -158,9 +159,6 @@ export function PanelSystem({ preset }: PanelSystemProps): React.ReactNode {
             <div className="panel-content">
               {editorView === 'script-only' && (
                 <ScriptOnlyView sections={sections} onUpdateSection={updateSection} />
-              )}
-              {editorView === 'dual-pane' && (
-                <DualPaneView sections={sections} onUpdateSection={updateSection} />
               )}
               {editorView === 'inline' && (
                 <InlineEditorView />

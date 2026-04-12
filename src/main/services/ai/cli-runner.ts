@@ -77,6 +77,79 @@ export function runCLI(
 }
 
 /**
+ * Run a CLI binary with streaming stdout.
+ * Calls onStdout per data event on stdout.
+ * Returns the full concatenated output when the process completes.
+ */
+export function runCLIStreaming(
+  binary: string,
+  args: string[],
+  stdinData: string | null,
+  onStdout: (chunk: string) => void,
+  timeoutMs = 120_000,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(binary, args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env },
+    })
+
+    let stdout = ''
+    let stderr = ''
+    let killed = false
+
+    const timer = setTimeout(() => {
+      killed = true
+      proc.kill('SIGTERM')
+      reject(new Error(`${binary} timed out after ${timeoutMs}ms`))
+    }, timeoutMs)
+
+    proc.stdout.on('data', (chunk: Buffer) => {
+      const text = chunk.toString()
+      stdout += text
+      onStdout(text)
+    })
+
+    proc.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString()
+    })
+
+    proc.on('error', (err: NodeJS.ErrnoException) => {
+      clearTimeout(timer)
+      if (err.code === 'ENOENT') {
+        reject(new Error(`CLI binary "${binary}" not found. Ensure it is installed and on your PATH.`))
+      } else {
+        reject(err)
+      }
+    })
+
+    proc.on('close', (code, signal) => {
+      clearTimeout(timer)
+      if (killed) return
+
+      if (signal) {
+        reject(new Error(`${binary} was terminated by signal ${signal}`))
+        return
+      }
+
+      if (code !== 0) {
+        reject(new Error(`${binary} exited with code ${code}: ${stderr.slice(-500)}`))
+        return
+      }
+
+      resolve(stdout)
+    })
+
+    if (stdinData !== null && stdinData !== undefined) {
+      proc.stdin.write(stdinData)
+      proc.stdin.end()
+    } else {
+      proc.stdin.end()
+    }
+  })
+}
+
+/**
  * Check if a CLI binary is available on PATH (synchronous).
  */
 export function isCLIAvailable(binary: string): boolean {

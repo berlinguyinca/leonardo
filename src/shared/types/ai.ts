@@ -1,6 +1,6 @@
 import type { DOMEvent } from './events'
 
-export type AIProviderType = 'claude' | 'openai' | 'ollama'
+export type AIProviderType = 'claude' | 'openai' | 'codex' | 'ollama'
 export type AIMode = 'cloud' | 'local'
 
 export interface AIBackendConfig {
@@ -37,6 +37,22 @@ export interface ScriptSection {
   endTime: number
   timingMarkers: TimingMarker[]
   order: number
+  eventIds?: string[]
+  actionMarkers?: ActionMarker[]
+  freezeOverrideDuration?: number | null
+}
+
+export interface ActionMarker {
+  eventId: string
+  position: number
+  label: string
+}
+
+export interface GenerationLogEntry {
+  timestamp: number
+  level: 'info' | 'warn' | 'error'
+  message: string
+  data?: unknown
 }
 
 export type TimingMarkerType = 'pause' | 'zoom' | 'freeze' | 'transition'

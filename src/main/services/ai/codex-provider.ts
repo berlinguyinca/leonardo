@@ -1,4 +1,7 @@
 import { v4 as uuid } from 'uuid'
+import { tmpdir } from 'os'
+import { join } from 'path'
+import { readFileSync, unlinkSync } from 'fs'
 import type { IAIProvider } from '@shared/interfaces/ai-provider'
 import type { Script, ScriptGenContext } from '@shared/types/ai'
 import type { DOMEvent } from '@shared/types/events'
@@ -7,12 +10,12 @@ import { getSystemPrompt, buildScriptPrompt } from './prompt-templates'
 import { parseScriptText } from './script-parser'
 import { runCLI, runCLIStreaming, isCLIAvailable } from './cli-runner'
 
-export class ClaudeProvider implements IAIProvider {
-  readonly name = 'Claude (CLI)'
+export class CodexProvider implements IAIProvider {
+  readonly name = 'codex'
   private readonly model: string
   private readonly cliPath: string
 
-  constructor(model = 'claude-sonnet-4-20250514', cliPath = 'claude') {
+  constructor(model = 'o4-mini', cliPath = 'codex') {
     this.model = model
     this.cliPath = cliPath
   }
@@ -24,26 +27,16 @@ export class ClaudeProvider implements IAIProvider {
   async generateScript(prompt: string, context: ScriptGenContext): Promise<Script> {
     const scriptId = uuid()
     const userMessage = `${prompt}\n\n${buildScriptPrompt(context)}`
+    const combinedPrompt = `SYSTEM INSTRUCTIONS:\n${getSystemPrompt()}\n\nUSER REQUEST:\n${userMessage}`
 
-    const args = [
-      '-p',
-      '--system-prompt', getSystemPrompt(),
-      '--output-format', 'text',
-      '--model', this.model,
-      '--no-session-persistence',
-      '--tools', '',
-      '--bare',
-    ]
-
-    const result = await runCLI(this.cliPath, args, userMessage)
-    const text = result.stdout.trim()
+    const text = await this.runCodex(combinedPrompt)
     const sections = parseScriptText(text, scriptId)
 
     return {
       id: scriptId,
       projectId: '',
       sections,
-      aiBackendUsed: 'claude',
+      aiBackendUsed: 'codex',
       prompt,
       generatedAt: new Date().toISOString(),
     }
@@ -56,25 +49,25 @@ export class ClaudeProvider implements IAIProvider {
   ): Promise<Script> {
     const scriptId = uuid()
     const userMessage = `${prompt}\n\n${buildScriptPrompt(context)}`
+    const combinedPrompt = `SYSTEM INSTRUCTIONS:\n${getSystemPrompt()}\n\nUSER REQUEST:\n${userMessage}`
 
     const args = [
-      '-p',
-      '--system-prompt', getSystemPrompt(),
-      '--output-format', 'text',
-      '--model', this.model,
-      '--no-session-persistence',
-      '--tools', '',
-      '--bare',
+      'exec',
+      '--sandbox', 'read-only',
+      '--skip-git-repo-check',
+      '--ephemeral',
+      '-m', this.model,
+      '-o', '/dev/stdout',
     ]
 
-    const fullOutput = await runCLIStreaming(this.cliPath, args, userMessage, onChunk)
+    const fullOutput = await runCLIStreaming(this.cliPath, args, combinedPrompt, onChunk)
     const sections = parseScriptText(fullOutput.trim(), scriptId)
 
     return {
       id: scriptId,
       projectId: '',
       sections,
-      aiBackendUsed: 'claude',
+      aiBackendUsed: 'codex',
       prompt,
       generatedAt: new Date().toISOString(),
     }
@@ -90,23 +83,11 @@ export class ClaudeProvider implements IAIProvider {
       .map((e) => `[${(e.timestamp / 1000).toFixed(1)}s] ${e.type} on ${e.elementSelector}`)
       .join('\n')
 
-    const userMessage = `Given these script sections:\n${sectionsText}\n\nAnd these DOM events:\n${eventsText}\n\nReturn a JSON array of sync points. Each sync point should have: timestamp (ms), type ("freeze"|"zoom"|"annotation"|"transition"), duration (ms), confidence (0-1). Only return the JSON array, no other text.`
-
-    const systemPrompt = 'You are a video sync point analyzer. Return only valid JSON arrays.'
-
-    const args = [
-      '-p',
-      '--system-prompt', systemPrompt,
-      '--output-format', 'text',
-      '--model', this.model,
-      '--no-session-persistence',
-      '--tools', '',
-      '--bare',
-    ]
+    const combinedPrompt = `SYSTEM INSTRUCTIONS:\nYou are a video sync point analyzer. Return only valid JSON arrays.\n\nUSER REQUEST:\nGiven these script sections:\n${sectionsText}\n\nAnd these DOM events:\n${eventsText}\n\nReturn a JSON array of sync points. Each sync point should have: timestamp (ms), type ("freeze"|"zoom"|"annotation"|"transition"), duration (ms), confidence (0-1). Only return the JSON array, no other text.`
 
     try {
-      const result = await runCLI(this.cliPath, args, userMessage)
-      const jsonMatch = result.stdout.match(/\[[\s\S]*\]/)
+      const text = await this.runCodex(combinedPrompt)
+      const jsonMatch = text.match(/\[[\s\S]*\]/)
       if (!jsonMatch) return []
 
       const raw = JSON.parse(jsonMatch[0]) as Array<{
@@ -132,11 +113,44 @@ export class ClaudeProvider implements IAIProvider {
 
   async testConnection(): Promise<boolean> {
     try {
-      const args = ['-p', '--bare', '--tools', '', '--no-session-persistence', 'ping']
-      const result = await runCLI(this.cliPath, args, undefined, 30_000)
-      return result.stdout.length > 0
+      await this.runCodex('Reply OK', 30_000)
+      return true
     } catch {
       return false
+    }
+  }
+
+  private async runCodex(prompt: string, timeoutMs?: number): Promise<string> {
+    const isWin = process.platform === 'win32'
+
+    if (isWin) {
+      const tempFile = join(tmpdir(), `leonardo-codex-${uuid()}.txt`)
+      const args = [
+        'exec',
+        '--sandbox', 'read-only',
+        '--skip-git-repo-check',
+        '--ephemeral',
+        '-m', this.model,
+        '-o', tempFile,
+      ]
+      await runCLI(this.cliPath, args, prompt, timeoutMs)
+      try {
+        const output = readFileSync(tempFile, 'utf-8')
+        return output.trim()
+      } finally {
+        try { unlinkSync(tempFile) } catch { /* ignore cleanup errors */ }
+      }
+    } else {
+      const args = [
+        'exec',
+        '--sandbox', 'read-only',
+        '--skip-git-repo-check',
+        '--ephemeral',
+        '-m', this.model,
+        '-o', '/dev/stdout',
+      ]
+      const result = await runCLI(this.cliPath, args, prompt, timeoutMs)
+      return result.stdout.trim()
     }
   }
 }

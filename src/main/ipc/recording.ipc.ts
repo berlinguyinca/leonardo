@@ -1,13 +1,12 @@
-import { ipcMain, BrowserWindow } from 'electron'
+import { ipcMain } from 'electron'
 import { join } from 'path'
 import { app } from 'electron'
 import * as fs from 'fs'
 import { v4 as uuidv4 } from 'uuid'
 import { IPC_CHANNELS } from '@shared/constants'
 import { startCapture, stopCapture, handleDOMEvent, isLeonardoEvent } from '../services/dom-capture'
-import { processRecording } from '../workers/recording-worker'
-import { getFFmpegPath } from '../utils/ffmpeg'
-import type { DOMEvent } from '@shared/types/events'
+import { startFrameCapture, stopFrameCapture, pauseFrameCapture, resumeFrameCapture } from '../services/frame-capture'
+import { assertTrustedIPCEvent } from './security'
 
 interface RecordingSession {
   id: string
@@ -16,12 +15,10 @@ interface RecordingSession {
   status: 'recording' | 'paused' | 'stopped'
   startTime: number
   outputDir: string
+  videoPath: string
 }
 
 let currentSession: RecordingSession | null = null
-
-// Store DOM events by recording ID so recording:convert can retrieve them
-const pendingEvents: Map<string, DOMEvent[]> = new Map()
 
 let registered = false
 
@@ -29,25 +26,25 @@ let registered = false
 export function _resetRegistrationForTesting(): void {
   registered = false
   currentSession = null
-  pendingEvents.clear()
 }
 
 export function registerRecordingIPC(): void {
   if (registered) return
   registered = true
+
   ipcMain.handle(
     IPC_CHANNELS.RECORDING_START,
-    async (_event, args: { webviewId: number; projectId?: string }) => {
+    async (event, args: { webviewId: number; projectId?: string }) => {
+      assertTrustedIPCEvent(event)
       if (currentSession) {
         return { success: false, error: 'Recording already in progress' }
       }
 
-      // Clear any stale pending events from a previous abandoned recording
-      pendingEvents.clear()
-
       const recordingId = uuidv4()
       const outputDir = join(app.getPath('userData'), 'recordings', recordingId)
       fs.mkdirSync(outputDir, { recursive: true })
+
+      const videoPath = join(outputDir, `${recordingId}.mp4`)
 
       currentSession = {
         id: recordingId,
@@ -56,10 +53,19 @@ export function registerRecordingIPC(): void {
         status: 'recording',
         startTime: Date.now(),
         outputDir,
+        videoPath,
       }
 
       // Start DOM event capture
       startCapture(args.webviewId)
+
+      // Start frame capture → FFmpeg pipeline
+      try {
+        startFrameCapture(args.webviewId, videoPath)
+      } catch (err) {
+        // Frame capture failed — continue with DOM-only recording
+        console.warn('[Recording] Frame capture failed:', err)
+      }
 
       return {
         success: true,
@@ -69,7 +75,8 @@ export function registerRecordingIPC(): void {
     },
   )
 
-  ipcMain.handle(IPC_CHANNELS.RECORDING_STOP, async () => {
+  ipcMain.handle(IPC_CHANNELS.RECORDING_STOP, async (event) => {
+    assertTrustedIPCEvent(event)
     if (!currentSession) {
       return { success: false, error: 'No recording in progress' }
     }
@@ -80,65 +87,49 @@ export function registerRecordingIPC(): void {
     // Stop DOM capture and collect events
     const domEvents = stopCapture(session.webContentsId)
 
-    // Store events keyed by recording ID for recording:convert to pick up
-    pendingEvents.set(session.id, domEvents)
+    // Stop frame capture and finalize the MP4
+    let videoPath = ''
+    try {
+      videoPath = await stopFrameCapture()
+    } catch (err) {
+      console.warn('[Recording] Frame capture stop failed:', err)
+    }
 
-    // The renderer will have saved the WebM blob via MediaRecorder.
-    // The IPC stop returns session info; the renderer sends the blob path separately.
+    // Save DOM events to JSON
+    const eventsPath = join(session.outputDir, `${session.id}.events.json`)
+    await fs.promises.writeFile(eventsPath, JSON.stringify(domEvents, null, 2))
+
     return {
       success: true,
       recordingId: session.id,
+      videoPath: videoPath || session.videoPath,
       outputDir: session.outputDir,
       domEvents,
       duration: Date.now() - session.startTime,
     }
   })
 
-  // Handle conversion request after renderer saves the WebM file
-  ipcMain.handle(
-    'recording:convert',
-    async (
-      _event,
-      args: { recordingId: string; webmPath: string; outputDir: string; projectId: string },
-    ) => {
-      // Retrieve events stored at stop time and clear them
-      const domEvents = pendingEvents.get(args.recordingId) ?? []
-      pendingEvents.delete(args.recordingId)
-
-      const mainWindow = BrowserWindow.getAllWindows()[0]
-      const result = await processRecording(
-        {
-          inputPath: args.webmPath,
-          outputDir: args.outputDir,
-          projectId: args.projectId,
-          recordingId: args.recordingId,
-          domEvents,
-          ffmpegPath: getFFmpegPath(),
-        },
-        (progress) => {
-          mainWindow?.webContents.send(IPC_CHANNELS.RENDER_PROGRESS, {
-            recordingId: args.recordingId,
-            ...progress,
-          })
-        },
-      )
-
-      return result
-    },
-  )
-
-  // Pause/resume are simple state changes
-  ipcMain.handle('recording:pause', async () => {
-    if (currentSession) currentSession.status = 'paused'
+  // Pause/resume control the frame capture interval
+  ipcMain.handle('recording:pause', async (event) => {
+    assertTrustedIPCEvent(event)
+    if (currentSession) {
+      currentSession.status = 'paused'
+      pauseFrameCapture()
+    }
     return { success: true }
   })
 
-  ipcMain.handle('recording:resume', async () => {
-    if (currentSession) currentSession.status = 'recording'
+  ipcMain.handle('recording:resume', async (event) => {
+    assertTrustedIPCEvent(event)
+    if (currentSession) {
+      currentSession.status = 'recording'
+      resumeFrameCapture()
+    }
     return { success: true }
   })
 
-  ipcMain.handle(IPC_CHANNELS.WORKER_STATUS, async () => {
+  ipcMain.handle(IPC_CHANNELS.WORKER_STATUS, async (event) => {
+    assertTrustedIPCEvent(event)
     return {
       isRecording: currentSession !== null,
       recordingId: currentSession?.id ?? null,
@@ -147,27 +138,15 @@ export function registerRecordingIPC(): void {
     }
   })
 
-  // Save WebM blob received from renderer to disk
-  ipcMain.handle(
-    'recording:save-blob',
-    async (_event, args: { outputDir: string; buffer: ArrayBuffer }) => {
-      try {
-        const webmPath = join(args.outputDir, 'recording.webm')
-        await fs.promises.writeFile(webmPath, Buffer.from(args.buffer))
-        return { success: true, webmPath }
-      } catch (err) {
-        return { success: false, error: (err as Error).message, webmPath: '' }
-      }
-    },
-  )
-
   // Expose webview preload path to the renderer
-  ipcMain.handle('recording:get-webview-preload-path', () =>
-    'file://' + join(__dirname, '../preload/webview-preload.js'),
-  )
+  ipcMain.handle('recording:get-webview-preload-path', (event) => {
+    assertTrustedIPCEvent(event)
+    return 'file://' + join(__dirname, '../preload/webview-preload.js')
+  })
 
   // DOM events are relayed from renderer (which listens on the <webview> ipc-message event)
-  ipcMain.on('dom-event-relay', (_event, data) => {
+  ipcMain.on('dom-event-relay', (event, data) => {
+    assertTrustedIPCEvent(event)
     if (currentSession && isLeonardoEvent(data)) {
       handleDOMEvent(currentSession.webContentsId, data)
     }

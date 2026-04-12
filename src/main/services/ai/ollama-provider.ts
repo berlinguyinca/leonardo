@@ -23,7 +23,7 @@ export class OllamaProvider implements IAIProvider {
 
   async generateScript(prompt: string, context: ScriptGenContext): Promise<Script> {
     const scriptId = uuidv4()
-    const userMessage = buildScriptPrompt(context)
+    const userMessage = `${prompt}\n\n${buildScriptPrompt(context)}`
 
     const response = await this.chat([
       { role: 'system', content: getSystemPrompt() },
@@ -31,6 +31,73 @@ export class OllamaProvider implements IAIProvider {
     ])
 
     const sections = parseScriptText(response, scriptId)
+
+    return {
+      id: scriptId,
+      projectId: '',
+      sections,
+      aiBackendUsed: 'ollama',
+      prompt,
+      generatedAt: new Date().toISOString(),
+    }
+  }
+
+  async generateScriptStream(
+    prompt: string,
+    context: ScriptGenContext,
+    onChunk: (chunk: string) => void,
+  ): Promise<Script> {
+    const scriptId = uuidv4()
+    const userMessage = `${prompt}\n\n${buildScriptPrompt(context)}`
+
+    const response = await fetch(`${this.baseUrl}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: this.model,
+        messages: [
+          { role: 'system', content: getSystemPrompt() },
+          { role: 'user', content: userMessage },
+        ],
+        stream: true,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Ollama API error: ${response.status} ${response.statusText}`)
+    }
+
+    let fullText = ''
+    const reader = response.body?.getReader()
+    if (!reader) {
+      throw new Error('Ollama response body is not readable')
+    }
+
+    const decoder = new TextDecoder()
+    let done = false
+    while (!done) {
+      const result = await reader.read()
+      done = result.done
+      if (result.value) {
+        const chunk = decoder.decode(result.value, { stream: true })
+        // Ollama streams NDJSON — one JSON object per line
+        const lines = chunk.split('\n').filter((line) => line.trim().length > 0)
+        for (const line of lines) {
+          try {
+            const parsed = JSON.parse(line) as { message?: { content?: string }; done?: boolean }
+            const content = parsed.message?.content ?? ''
+            if (content) {
+              fullText += content
+              onChunk(content)
+            }
+          } catch {
+            // Skip malformed NDJSON lines
+          }
+        }
+      }
+    }
+
+    const sections = parseScriptText(fullText, scriptId)
 
     return {
       id: scriptId,

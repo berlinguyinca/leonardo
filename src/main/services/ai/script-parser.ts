@@ -1,4 +1,4 @@
-import type { ScriptSection, TimingMarker } from '@shared/types/ai'
+import type { ScriptSection, TimingMarker, ActionMarker } from '@shared/types/ai'
 import { v4 as uuidv4 } from 'uuid'
 
 /**
@@ -10,6 +10,7 @@ import { v4 as uuidv4 } from 'uuid'
  *   Let me show you how to submit a form. [ZOOM .submit-btn]
  *
  *   2. [TRANSITION fade] Now click the submit button. [FREEZE 2.0]
+ *   [ACTION: evt-001 "Click submit"]
  */
 export function parseScriptText(text: string, scriptId: string): ScriptSection[] {
   const sections: ScriptSection[] = []
@@ -18,6 +19,7 @@ export function parseScriptText(text: string, scriptId: string): ScriptSection[]
   for (let i = 0; i < rawSections.length; i++) {
     const raw = rawSections[i]
     const { cleanText, markers } = extractTimingMarkers(raw)
+    const actionMarkers = extractActionMarkers(raw)
 
     if (cleanText.trim().length === 0) continue
 
@@ -29,6 +31,7 @@ export function parseScriptText(text: string, scriptId: string): ScriptSection[]
       startTime: 0,
       endTime: 0,
       timingMarkers: markers,
+      actionMarkers: actionMarkers.length > 0 ? actionMarkers : undefined,
       order: i,
     })
   }
@@ -107,5 +110,25 @@ export function extractTimingMarkers(text: string): {
   }
   cleanText = cleanText.replace(transitionRegex, '')
 
+  // Remove ACTION markers from clean text as well
+  cleanText = cleanText.replace(/\[ACTION:\s+[^\]]+\]/gi, '')
+
   return { cleanText, markers }
+}
+
+/**
+ * Extract [ACTION: eventId "description"] markers from text.
+ */
+export function extractActionMarkers(text: string): ActionMarker[] {
+  const markers: ActionMarker[] = []
+  const actionRegex = /\[ACTION:\s+(\S+)\s+"([^"]+)"\]/gi
+  let match: RegExpExecArray | null
+  while ((match = actionRegex.exec(text)) !== null) {
+    markers.push({
+      eventId: match[1],
+      position: match.index,
+      label: match[2],
+    })
+  }
+  return markers
 }

@@ -4,7 +4,6 @@ import type { EditorView } from '../../stores/ui-store'
 
 const VIEWS: { key: EditorView; label: string }[] = [
   { key: 'script-only', label: 'Script' },
-  { key: 'dual-pane', label: 'Split' },
   { key: 'inline', label: 'Timeline' },
 ]
 
@@ -16,7 +15,7 @@ export function ViewModeToggle(): React.ReactNode {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return
       const index = parseInt(e.key, 10)
-      if (index >= 1 && index <= 3) {
+      if (index >= 1 && index <= VIEWS.length) {
         e.preventDefault()
         setEditorView(VIEWS[index - 1].key)
       }

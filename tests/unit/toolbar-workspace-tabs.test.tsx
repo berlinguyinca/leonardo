@@ -6,7 +6,7 @@ import { Toolbar } from '@renderer/components/layout/Toolbar'
 
 describe('Toolbar — workspace tabs', () => {
   beforeEach(() => {
-    useUIStore.setState({ workspacePreset: 'editing', theme: 'dark' })
+    useUIStore.setState({ workspacePreset: 'compose', theme: 'dark' })
     ;(window as Record<string, unknown>).leonardo = undefined
   })
 
@@ -15,17 +15,18 @@ describe('Toolbar — workspace tabs', () => {
     expect(screen.getByText('LEONARDO')).toBeDefined()
   })
 
-  it('renders three workspace tab buttons', () => {
+  it('renders four workspace tab buttons', () => {
     render(<Toolbar />)
     expect(screen.getByTitle('Switch to recording workspace')).toBeDefined()
-    expect(screen.getByTitle('Switch to editing workspace')).toBeDefined()
+    expect(screen.getByTitle('Switch to compose workspace')).toBeDefined()
+    expect(screen.getByTitle('Switch to script workspace')).toBeDefined()
     expect(screen.getByTitle('Switch to export workspace')).toBeDefined()
   })
 
   it('active workspace tab has workspace-tab-active class', () => {
     render(<Toolbar />)
-    const editTab = screen.getByTitle('Switch to editing workspace')
-    expect(editTab.classList.contains('workspace-tab-active')).toBe(true)
+    const composeTab = screen.getByTitle('Switch to compose workspace')
+    expect(composeTab.classList.contains('workspace-tab-active')).toBe(true)
   })
 
   it('clicking a tab calls setWorkspacePreset', () => {

@@ -1,7 +1,7 @@
 export type SyncPointType = 'freeze' | 'zoom' | 'annotation' | 'transition'
 export type SyncPointSource = 'dom' | 'script' | 'manual'
 export type TrackType = 'recording' | 'clip' | 'overlay' | 'audio'
-export type TransitionType = 'fade' | 'cut' | 'dissolve'
+export type TransitionType = 'fade' | 'cut' | 'dissolve' | 'wipe'
 
 export interface SyncTimeline {
   id: string
