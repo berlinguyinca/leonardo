@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
+import { Timeline } from '../timeline/Timeline'
 import { useScriptStore } from '../../stores/script-store'
 import { useComposeStore } from '../../stores/compose-store'
 import type { AIProviderType } from '@shared/types/ai'
@@ -304,7 +305,7 @@ export function ScriptPresetView(): React.ReactNode {
         }}
       />
 
-      {/* Bottom: Timeline placeholder */}
+      {/* Bottom: Timeline */}
       <div
         className="timeline-container"
         style={{
@@ -328,17 +329,8 @@ export function ScriptPresetView(): React.ReactNode {
         >
           Timeline
         </div>
-        <div
-          style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--text-muted, #555)',
-            fontSize: 12,
-          }}
-        >
-          Timeline will appear here
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <Timeline />
         </div>
       </div>
     </div>

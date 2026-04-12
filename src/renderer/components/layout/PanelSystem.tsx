@@ -70,6 +70,24 @@ export function PanelSystem({ preset }: PanelSystemProps): React.ReactNode {
 
   const effectiveTimelineHeight = timelineCollapsed ? COLLAPSED_SIZE : timelineHeight
 
+  // Script preset: ScriptPresetView owns the entire layout (no sidebar, no properties, no outer timeline)
+  if (preset === 'script') {
+    return (
+      <div className="panel-system">
+        <div className="panel-main" style={{ width: '100%' }}>
+          <div className="panel-top" style={{ height: '100%' }}>
+            <div className="panel panel-preview" style={{ width: '100%' }}>
+              <div className="panel-header">Script</div>
+              <div className="panel-content">
+                <ScriptPresetView />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="panel-system">
       {/* Left Sidebar - Clip Library */}
@@ -104,12 +122,11 @@ export function PanelSystem({ preset }: PanelSystemProps): React.ReactNode {
         <div className="panel-top" style={{ height: `calc(100% - ${effectiveTimelineHeight}px - 4px)` }}>
           <div className="panel panel-preview">
             <div className="panel-header">
-              {preset === 'recording' ? 'Browser' : preset === 'compose' ? 'Compose' : preset === 'script' ? 'Script' : 'Preview'}
+              {preset === 'recording' ? 'Browser' : preset === 'compose' ? 'Compose' : 'Preview'}
             </div>
             <div className="panel-content">
               {preset === 'recording' && <RecordingBrowser />}
               {preset === 'compose' && <ComposeView />}
-              {preset === 'script' && <ScriptPresetView />}
               {preset === 'export' && <PlaybackPanel />}
             </div>
           </div>
@@ -136,12 +153,12 @@ export function PanelSystem({ preset }: PanelSystemProps): React.ReactNode {
           </div>
         </div>
 
-        {/* Timeline Resize Handle — editing/export only */}
+        {/* Timeline Resize Handle — compose/export only */}
         {preset !== 'recording' && !timelineCollapsed && (
           <div className="resize-handle resize-handle-h" onMouseDown={handleMouseDown('timeline')} />
         )}
 
-        {/* Bottom Section - Timeline — editing/export only */}
+        {/* Bottom Section - Timeline — compose/export only */}
         {preset !== 'recording' && <div
           className={`panel panel-timeline ${timelineCollapsed ? 'panel-collapsed' : ''}`}
           style={{ height: effectiveTimelineHeight }}
