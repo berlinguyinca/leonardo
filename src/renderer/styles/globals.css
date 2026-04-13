@@ -2093,3 +2093,14 @@ body {
   border-radius: 2px;
   transition: background 0.2s ease;
 }
+
+/* Word-level highlighting during voiceover playback */
+.tiptap-editor .ProseMirror .word-span {
+  /* No default styling — just enables targeting */
+}
+
+.tiptap-editor .ProseMirror .word-active {
+  background: rgba(74, 158, 255, 0.25);
+  border-radius: 2px;
+  transition: background 0.08s ease;
+}
