@@ -13,6 +13,9 @@ vi.mock('electron', () => ({
   dialog: {
     showSaveDialog: vi.fn(),
   },
+  app: {
+    getPath: (_name: string) => '/tmp/test-userData',
+  },
 }))
 
 const mockCreateClip = vi.fn()
@@ -87,10 +90,12 @@ describe('clip IPC handlers', () => {
     // Default stub: listClips returns empty array
     mockListClips.mockReturnValue([])
 
-    // Default stub: db with no-op prepare
+    // Default stub: db with transaction support
     const mockRun = vi.fn()
     const mockPrepare = vi.fn().mockReturnValue({ run: mockRun })
-    mockGetDatabase.mockReturnValue({ prepare: mockPrepare })
+    // transaction() returns a function; calling that function executes the callback
+    const mockTransaction = vi.fn().mockImplementation((fn: () => void) => () => fn())
+    mockGetDatabase.mockReturnValue({ prepare: mockPrepare, transaction: mockTransaction })
 
     registerClipIPC()
   })
@@ -107,6 +112,15 @@ describe('clip IPC handlers', () => {
 
       expect(mockCreateClip).toHaveBeenCalledWith(clip)
       expect(result).toEqual(clip)
+    })
+
+    it('returns { success: false, error } when createClip throws', async () => {
+      mockCreateClip.mockImplementation(() => { throw new Error('DB error') })
+
+      const result = await invokeHandle('clip:create', makeClip()) as { success: boolean; error: string }
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('DB error')
     })
   })
 
@@ -133,36 +147,60 @@ describe('clip IPC handlers', () => {
       expect(mockListClips).toHaveBeenCalledWith('proj-99')
       expect(result).toEqual(clips)
     })
+
+    it('returns { success: false, error } when listClips throws', async () => {
+      mockListClips.mockImplementation(() => { throw new Error('list error') })
+
+      const result = await invokeHandle('clip:list') as { success: boolean; error: string }
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('list error')
+    })
   })
 
   // -----------------------------------------------------------------------
   // CLIP_DELETE
   // -----------------------------------------------------------------------
   describe('clip:delete', () => {
-    it('deletes scripts and sections from DB, removes recording dir, then deletes clip', async () => {
-      const clip = makeClip({ id: 'clip-del', filePath: '/recordings/session/clip.mp4' })
+    it('runs DB deletes in a transaction and deletes clip atomically', async () => {
+      // Use a path under the recordings root so rm is called
+      const clip = makeClip({
+        id: 'clip-del',
+        filePath: '/tmp/test-userData/recordings/session/clip.mp4',
+      })
       mockListClips.mockReturnValue([clip])
-      mockDeleteClip.mockReturnValue(true)
 
-      const result = await invokeHandle('clip:delete', 'clip-del')
+      await invokeHandle('clip:delete', 'clip-del')
 
-      // DB cascade deletes
+      // DB cascade deletes wrapped in transaction
       expect(mockGetDatabase).toHaveBeenCalled()
       const db = mockGetDatabase.mock.results[0].value
+      expect(db.transaction).toHaveBeenCalled()
       expect(db.prepare).toHaveBeenCalledWith(
         'DELETE FROM script_sections WHERE script_id IN (SELECT id FROM scripts WHERE clip_id = ?)',
       )
       expect(db.prepare).toHaveBeenCalledWith('DELETE FROM scripts WHERE clip_id = ?')
+      // deleteClip called inside the transaction
+      expect(mockDeleteClip).toHaveBeenCalledWith('clip-del')
 
-      // Directory removal — dirname of /recordings/session/clip.mp4 = /recordings/session
-      expect(fs.promises.rm).toHaveBeenCalledWith('/recordings/session', {
+      // Directory removal — inside recordings root so rm is called
+      expect(fs.promises.rm).toHaveBeenCalledWith('/tmp/test-userData/recordings/session', {
         recursive: true,
         force: true,
       })
+    })
 
-      // Final clip delete
+    it('skips directory deletion when clip dir is not under recordings root', async () => {
+      // /recordings/session is NOT under /tmp/test-userData/recordings
+      const clip = makeClip({ id: 'clip-del', filePath: '/recordings/session/clip.mp4' })
+      mockListClips.mockReturnValue([clip])
+
+      await invokeHandle('clip:delete', 'clip-del')
+
+      // DB transaction still ran
       expect(mockDeleteClip).toHaveBeenCalledWith('clip-del')
-      expect(result).toBe(true)
+      // But rm was NOT called since dir is outside recordings root
+      expect(fs.promises.rm).not.toHaveBeenCalled()
     })
 
     it('skips directory deletion when clip is not found', async () => {
@@ -174,6 +212,30 @@ describe('clip IPC handlers', () => {
       expect(fs.promises.rm).not.toHaveBeenCalled()
       expect(mockDeleteClip).toHaveBeenCalledWith('no-such-clip')
       expect(result).toBe(false)
+    })
+
+    it('returns { success: false, error } when transaction throws', async () => {
+      const clip = makeClip({ id: 'clip-err', filePath: '/tmp/test-userData/recordings/session/clip.mp4' })
+      mockListClips.mockReturnValue([clip])
+
+      const db = mockGetDatabase.mock.results[0]?.value ?? (() => {
+        const mockRun = vi.fn()
+        const mockPrepare = vi.fn().mockReturnValue({ run: mockRun })
+        const val = { prepare: mockPrepare, transaction: vi.fn() }
+        mockGetDatabase.mockReturnValue(val)
+        return val
+      })()
+
+      // Make transaction throw
+      mockGetDatabase.mockReturnValue({
+        prepare: vi.fn().mockReturnValue({ run: vi.fn() }),
+        transaction: vi.fn().mockImplementation(() => () => { throw new Error('transaction failed') }),
+      })
+
+      const result = await invokeHandle('clip:delete', 'clip-err') as { success: boolean; error: string }
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('transaction failed')
     })
   })
 

@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useCallback, useState } from 'react'
 
 interface VideoPlayerProps {
   src: string
@@ -10,6 +10,7 @@ interface VideoPlayerProps {
 export function VideoPlayer({ src, currentTime, playing, playbackRate }: VideoPlayerProps): React.ReactNode {
   const videoRef = useRef<HTMLVideoElement>(null)
   const readyRef = useRef(false)
+  const [error, setError] = useState<string | null>(null)
 
   // Keep prop values in refs so the loadeddata handler always has current values
   const currentTimeRef = useRef(currentTime)
@@ -19,10 +20,18 @@ export function VideoPlayer({ src, currentTime, playing, playbackRate }: VideoPl
   const playbackRateRef = useRef(playbackRate)
   playbackRateRef.current = playbackRate
 
-  // When src changes, video reloads — mark not ready
+  // When src changes, video reloads — mark not ready, clear any previous error
   useEffect(() => {
+    setError(null)
     readyRef.current = false
   }, [src])
+
+  const handleError = useCallback(() => {
+    const video = videoRef.current
+    const msg = video?.error?.message || 'Failed to load video'
+    console.error('[VideoPlayer] load error:', msg)
+    setError(msg)
+  }, [])
 
   // Apply pending play/seek when video data has loaded
   const handleLoadedData = useCallback(() => {
@@ -73,6 +82,10 @@ export function VideoPlayer({ src, currentTime, playing, playbackRate }: VideoPl
     }
   }, [currentTime, playing])
 
+  if (error) {
+    return <div className="playback-video playback-error">{error}</div>
+  }
+
   return (
     <video
       ref={videoRef}
@@ -80,6 +93,7 @@ export function VideoPlayer({ src, currentTime, playing, playbackRate }: VideoPl
       src={src}
       preload="auto"
       onLoadedData={handleLoadedData}
+      onError={handleError}
     />
   )
 }

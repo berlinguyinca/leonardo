@@ -1,5 +1,5 @@
 import { app, BrowserWindow, shell, protocol, net } from 'electron'
-import { join } from 'path'
+import { join, normalize } from 'path'
 import { registerProjectIPC } from './ipc/project.ipc'
 import { registerRecordingIPC } from './ipc/recording.ipc'
 import { registerAIIPC } from './ipc/ai.ipc'
@@ -57,9 +57,16 @@ app.whenReady().then(() => {
 
   // Serve local media files via media:// protocol (works in both dev and production)
   protocol.handle('media', (request) => {
-    // filePath is absolute (starts with /), so file:// + /path = file:///path (correct)
-    const filePath = decodeURIComponent(request.url.slice('media:///'.length))
-    return net.fetch(`file://${filePath}`)
+    // media:///abs/path — slice at 'media://'.length (8) to preserve the leading slash
+    // so filePath is absolute: /Users/foo/recording.mp4
+    // file:// + /abs/path = file:///abs/path (3 slashes, correct)
+    const filePath = decodeURIComponent(request.url.slice('media://'.length))
+    const normalized = normalize(filePath)
+    // Block path traversal — only serve absolute paths with no .. segments
+    if (!normalized.startsWith('/') || normalized.includes('..')) {
+      return new Response('Forbidden: invalid path', { status: 403 })
+    }
+    return net.fetch(`file://${normalized}`)
   })
   registerProjectIPC()
   registerRecordingIPC()

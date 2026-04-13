@@ -2,6 +2,8 @@
 import { spawn, execFileSync } from 'child_process'
 import path from 'path'
 
+const MAX_OUTPUT_BYTES = 10 * 1024 * 1024 // 10MB
+
 export interface CLIRunResult {
   stdout: string
   stderr: string
@@ -35,6 +37,11 @@ export function runCLI(
 
     proc.stdout.on('data', (chunk: Buffer) => {
       stdout += chunk.toString()
+      if (stdout.length > MAX_OUTPUT_BYTES) {
+        killed = true
+        proc.kill('SIGTERM')
+        reject(new Error(`${binary} output exceeded maximum size of 10MB`))
+      }
     })
 
     proc.stderr.on('data', (chunk: Buffer) => {
@@ -107,6 +114,12 @@ export function runCLIStreaming(
     proc.stdout.on('data', (chunk: Buffer) => {
       const text = chunk.toString()
       stdout += text
+      if (stdout.length > MAX_OUTPUT_BYTES) {
+        killed = true
+        proc.kill('SIGTERM')
+        reject(new Error(`${binary} output exceeded maximum size of 10MB`))
+        return
+      }
       onStdout(text)
     })
 

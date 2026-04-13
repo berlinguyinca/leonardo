@@ -1,4 +1,6 @@
+import { useState, useEffect } from 'react'
 import { useTimelineStore } from '../../stores/timeline-store'
+import { playheadEmitter } from '../../hooks/PlayheadEmitter'
 
 const STEP_MS = 5_000
 const FRAME_MS = Math.round(1000 / 15) // 1 frame at 15fps capture rate
@@ -72,8 +74,18 @@ interface TransportControlsProps {
 
 export function TransportControls({ seekTo }: TransportControlsProps): React.ReactNode {
   const isPlaying = useTimelineStore((s) => s.isPlaying)
-  const position = useTimelineStore((s) => s.playheadPosition)
+  const storePosition = useTimelineStore((s) => s.playheadPosition)
   const duration = useTimelineStore((s) => s.timeline?.duration ?? 0)
+  const [emitterPosition, setEmitterPosition] = useState(storePosition)
+
+  useEffect(() => {
+    if (!isPlaying) return
+    const handler = (pos: number) => setEmitterPosition(pos)
+    playheadEmitter.on('position', handler)
+    return () => { playheadEmitter.off('position', handler) }
+  }, [isPlaying])
+
+  const position = isPlaying ? emitterPosition : storePosition
 
   return (
     <div className="transport-controls">

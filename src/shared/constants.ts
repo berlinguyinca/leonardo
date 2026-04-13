@@ -39,6 +39,7 @@ export const IPC_CHANNELS = {
   CLIP_GET_EVENTS: 'clip:get-events',
   CLIP_GET_THUMBNAILS: 'clip:get-thumbnails',
   LOG_READ: 'log:read',
+  LOG_CLEAR: 'log:clear',
   SCRIPT_SAVE: 'script:save',
   SCRIPT_LIST_BY_PROJECT: 'script:list-by-project',
   SETTINGS_GET: 'settings:get',

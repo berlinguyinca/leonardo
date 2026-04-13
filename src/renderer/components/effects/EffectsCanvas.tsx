@@ -96,6 +96,7 @@ export function EffectsCanvas(): React.ReactNode {
   return (
     <div
       className="effects-canvas"
+      data-overlay-canvas
       style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: '#000' }}
       onClick={() => setSelectedElement(null)}
     >

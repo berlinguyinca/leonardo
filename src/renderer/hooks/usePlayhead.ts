@@ -43,6 +43,8 @@ export function usePlayhead() {
     }
 
     let lastTime = performance.now()
+    const COMMIT_INTERVAL_MS = 250
+    let lastCommitTime = performance.now()
 
     const tick = (now: number) => {
       const dt = now - lastTime
@@ -64,6 +66,10 @@ export function usePlayhead() {
         return
       }
       setVisualPosition(newPos)
+      if (now - lastCommitTime > COMMIT_INTERVAL_MS) {
+        setPlayheadPosition(positionRef.current)
+        lastCommitTime = now
+      }
       rafRef.current = requestAnimationFrame(tick)
     }
 

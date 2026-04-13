@@ -1,4 +1,4 @@
-import { ipcMain, dialog } from 'electron'
+import { dialog } from 'electron'
 import { IPC_CHANNELS } from '@shared/constants'
 import type { Project, InputModeType, Resolution } from '@shared/types/project'
 import { v4 as uuidv4 } from 'uuid'
@@ -6,51 +6,52 @@ import * as projectStore from '../services/project-store'
 import { getSetting, setSetting } from '../services/settings'
 import { exportArchive, importArchive } from '../services/archive'
 import { assertTrustedIPCEvent } from './security'
+import { safeHandle } from './safe-handle'
 
 export function registerProjectIPC(): void {
-  ipcMain.handle(
+  safeHandle(
     IPC_CHANNELS.PROJECT_CREATE,
-    async (event, args: { name: string; inputMode: InputModeType; resolution: Resolution }) => {
+    async (event, args: unknown) => {
       assertTrustedIPCEvent(event)
-      return projectStore.createProject(uuidv4(), args.name, args.inputMode, args.resolution)
+      const { name, inputMode, resolution } = args as { name: string; inputMode: InputModeType; resolution: Resolution }
+      return projectStore.createProject(uuidv4(), name, inputMode, resolution)
     },
   )
 
-  ipcMain.handle(IPC_CHANNELS.PROJECT_GET, async (event, id: string) => {
+  safeHandle(IPC_CHANNELS.PROJECT_GET, async (event, id: unknown) => {
     assertTrustedIPCEvent(event)
-    return projectStore.getProject(id)
+    return projectStore.getProject(id as string)
   })
 
-  ipcMain.handle(IPC_CHANNELS.PROJECT_LIST, async (event) => {
+  safeHandle(IPC_CHANNELS.PROJECT_LIST, async (event) => {
     assertTrustedIPCEvent(event)
     return projectStore.listProjects()
   })
 
-  ipcMain.handle(
+  safeHandle(
     IPC_CHANNELS.PROJECT_UPDATE,
-    async (event, args: { id: string; updates: Partial<Project> }) => {
+    async (event, args: unknown) => {
       assertTrustedIPCEvent(event)
-      return projectStore.updateProject(args.id, args.updates)
+      const { id, updates } = args as { id: string; updates: Partial<Project> }
+      return projectStore.updateProject(id, updates)
     },
   )
 
-  ipcMain.handle(IPC_CHANNELS.PROJECT_DELETE, async (event, id: string) => {
+  safeHandle(IPC_CHANNELS.PROJECT_DELETE, async (event, id: unknown) => {
     assertTrustedIPCEvent(event)
-    return projectStore.deleteProject(id)
+    return projectStore.deleteProject(id as string)
   })
 
-  ipcMain.handle(
+  safeHandle(
     IPC_CHANNELS.ARCHIVE_EXPORT,
-    async (
-      event,
-      args: {
+    async (event, args: unknown) => {
+      assertTrustedIPCEvent(event)
+      const { projectId, mediaFiles, thumbnailFiles, settings } = args as {
         projectId: string
         mediaFiles: string[]
         thumbnailFiles: string[]
         settings: Record<string, unknown>
-      },
-    ) => {
-      assertTrustedIPCEvent(event)
+      }
       const result = await dialog.showSaveDialog({
         defaultPath: `project${'.leonardo'}`,
         filters: [{ name: 'Leonardo Project', extensions: ['leonardo'] }],
@@ -59,17 +60,17 @@ export function registerProjectIPC(): void {
 
       const dbPath = projectStore.getDatabase().name
       return exportArchive({
-        projectId: args.projectId,
+        projectId,
         dbPath,
-        mediaFiles: args.mediaFiles,
-        thumbnailFiles: args.thumbnailFiles,
-        settings: args.settings,
+        mediaFiles,
+        thumbnailFiles,
+        settings,
         outputPath: result.filePath,
       })
     },
   )
 
-  ipcMain.handle(IPC_CHANNELS.ARCHIVE_IMPORT, async (event) => {
+  safeHandle(IPC_CHANNELS.ARCHIVE_IMPORT, async (event) => {
     assertTrustedIPCEvent(event)
     const result = await dialog.showOpenDialog({
       filters: [{ name: 'Leonardo Project', extensions: ['leonardo'] }],
@@ -84,13 +85,14 @@ export function registerProjectIPC(): void {
     return importArchive(result.filePaths[0], extractDir)
   })
 
-  ipcMain.handle(IPC_CHANNELS.SETTINGS_GET, async (event, key: string) => {
+  safeHandle(IPC_CHANNELS.SETTINGS_GET, async (event, key: unknown) => {
     assertTrustedIPCEvent(event)
-    return getSetting(key)
+    return getSetting(key as string)
   })
 
-  ipcMain.handle(IPC_CHANNELS.SETTINGS_SET, async (event, args: { key: string; value: string }) => {
+  safeHandle(IPC_CHANNELS.SETTINGS_SET, async (event, args: unknown) => {
     assertTrustedIPCEvent(event)
-    setSetting(args.key, args.value)
+    const { key, value } = args as { key: string; value: string }
+    setSetting(key, value)
   })
 }

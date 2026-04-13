@@ -106,6 +106,8 @@ const api = {
   log: {
     read: (): Promise<string> =>
       ipcRenderer.invoke(IPC_CHANNELS.LOG_READ),
+    clear: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.LOG_CLEAR),
   },
   script: {
     save: (script: Script, clipId?: string): Promise<Script> =>

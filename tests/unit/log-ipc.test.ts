@@ -13,9 +13,11 @@ vi.mock('electron', () => ({
 }))
 
 const mockReadLog = vi.fn()
+const mockClearLog = vi.fn()
 
 vi.mock('@main/utils/logger', () => ({
   readLog: () => mockReadLog(),
+  clearLog: () => mockClearLog(),
 }))
 
 vi.mock('@main/ipc/security', () => ({
@@ -25,6 +27,7 @@ vi.mock('@main/ipc/security', () => ({
 vi.mock('@shared/constants', () => ({
   IPC_CHANNELS: {
     LOG_READ: 'log:read',
+    LOG_CLEAR: 'log:clear',
   },
 }))
 
@@ -52,6 +55,10 @@ describe('log IPC handlers', () => {
     expect(mockIpcHandlers.has('log:read')).toBe(true)
   })
 
+  it('registers a handler on the log:clear channel', () => {
+    expect(mockIpcHandlers.has('log:clear')).toBe(true)
+  })
+
   it('delegates to readLog and returns log content', async () => {
     mockReadLog.mockReturnValue('INFO line one\nWARN line two\n')
 
@@ -67,5 +74,29 @@ describe('log IPC handlers', () => {
     const result = await invokeHandle('log:read')
 
     expect(result).toBe('')
+  })
+
+  it('returns { success: false, error } when readLog throws', async () => {
+    mockReadLog.mockImplementation(() => { throw new Error('read error') })
+
+    const result = await invokeHandle('log:read') as { success: boolean; error: string }
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('read error')
+  })
+
+  it('calls clearLog when log:clear is invoked', async () => {
+    await invokeHandle('log:clear')
+
+    expect(mockClearLog).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns { success: false, error } when clearLog throws', async () => {
+    mockClearLog.mockImplementation(() => { throw new Error('clear error') })
+
+    const result = await invokeHandle('log:clear') as { success: boolean; error: string }
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('clear error')
   })
 })

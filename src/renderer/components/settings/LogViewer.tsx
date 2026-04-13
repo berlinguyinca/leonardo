@@ -33,6 +33,11 @@ export function LogViewer(): React.ReactNode {
     navigator.clipboard.writeText(logText)
   }
 
+  const handleClear = async (): Promise<void> => {
+    await window.leonardo.log.clear()
+    setLogText('(Log cleared)')
+  }
+
   return (
     <div className="log-viewer-overlay" onClick={() => setShowLogViewer(false)}>
       <div className="log-viewer-modal" onClick={(e) => e.stopPropagation()}>
@@ -44,6 +49,9 @@ export function LogViewer(): React.ReactNode {
             </button>
             <button className="toolbar-btn" onClick={handleCopy}>
               Copy
+            </button>
+            <button className="toolbar-btn" onClick={handleClear}>
+              Clear Log
             </button>
             <button className="toolbar-btn" onClick={() => setShowLogViewer(false)}>
               ×

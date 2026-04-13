@@ -1,31 +1,31 @@
-import { ipcMain } from 'electron'
 import { IPC_CHANNELS } from '@shared/constants'
 import type { SyncTimeline } from '@shared/types'
 import * as projectStore from '../services/project-store'
 import { assertTrustedIPCEvent } from './security'
+import { safeHandle } from './safe-handle'
 
 export function registerTimelineIPC(): void {
-  ipcMain.handle(
+  safeHandle(
     IPC_CHANNELS.TIMELINE_SAVE,
-    async (event, timeline: SyncTimeline) => {
+    async (event, timeline: unknown) => {
       assertTrustedIPCEvent(event)
-      projectStore.saveTimeline(timeline)
+      projectStore.saveTimeline(timeline as SyncTimeline)
     },
   )
 
-  ipcMain.handle(
+  safeHandle(
     IPC_CHANNELS.TIMELINE_GET,
-    async (event, projectId: string) => {
+    async (event, projectId: unknown) => {
       assertTrustedIPCEvent(event)
-      return projectStore.getTimeline(projectId)
+      return projectStore.getTimeline(projectId as string)
     },
   )
 
-  ipcMain.handle(
+  safeHandle(
     IPC_CHANNELS.TIMELINE_DELETE,
-    async (event, projectId: string) => {
+    async (event, projectId: unknown) => {
       assertTrustedIPCEvent(event)
-      return projectStore.deleteTimeline(projectId)
+      return projectStore.deleteTimeline(projectId as string)
     },
   )
 }
