@@ -1,12 +1,13 @@
 import { useMemo, useEffect, useRef, useState, useCallback } from 'react'
 import { useTimelineStore } from '../../stores/timeline-store'
 import { useLibraryStore } from '../../stores/library-store'
+import { useScriptStore } from '../../stores/script-store'
 import { playheadEmitter } from '../../hooks/PlayheadEmitter'
 import { VideoPlayer } from './VideoPlayer'
 import type { Segment } from '@shared/types'
 
 function filePathToMediaUrl(filePath: string): string {
-  return `media:///${filePath}`
+  return `media://${filePath}`
 }
 
 function findSegmentAt(timeline: { tracks: { type: string; segments: Segment[] }[] } | null, position: number): Segment | undefined {
@@ -23,6 +24,8 @@ export function PlaybackPanel(): React.ReactNode {
   const isPlaying = useTimelineStore((s) => s.isPlaying)
   const playbackRate = useTimelineStore((s) => s.playbackRate)
   const clips = useLibraryStore((s) => s.clips)
+  const voiceovers = useScriptStore((s) => s.voiceovers)
+  const audioRef = useRef<HTMLAudioElement>(null)
 
   // Real-time position tracking via emitter (only used during playback)
   const emitterPosRef = useRef(storePosition)
@@ -68,6 +71,55 @@ export function PlaybackPanel(): React.ReactNode {
     return clips.find((c) => c.filePath === activeSegment.sourceFile)
   }, [activeSegment, clips])
 
+  // Resolve active segment's voiceover (if any)
+  const activeSectionId = useMemo(() => {
+    if (!activeSegment?.metadata) return null
+    try {
+      const meta = JSON.parse(activeSegment.metadata) as { sectionId?: string }
+      return meta.sectionId ?? null
+    } catch { return null }
+  }, [activeSegment])
+
+  const activeVoiceover = activeSectionId ? voiceovers[activeSectionId] : null
+  const voiceoverSrc =
+    activeVoiceover && !activeVoiceover.stale && activeVoiceover.filePath
+      ? `media://${activeVoiceover.filePath}`
+      : null
+
+  // Calculate video time from playhead position relative to segment
+  // (computed here so we can use it in the effect below)
+  const videoTimeMs = activeSegment
+    ? effectivePosition - activeSegment.startTime + activeSegment.sourceOffset
+    : 0
+
+  // Sync audio with video playback — section-driven, not per-frame
+  const lastAudioSectionRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    if (!voiceoverSrc) {
+      audio.pause()
+      lastAudioSectionRef.current = null
+      return
+    }
+
+    if (isPlaying) {
+      if (activeSectionId !== lastAudioSectionRef.current) {
+        // New section — start voiceover from beginning
+        lastAudioSectionRef.current = activeSectionId
+        audio.currentTime = 0
+        audio.play().catch(() => {})
+      } else if (audio.paused) {
+        // Resuming in same section — continue from where we left off
+        audio.play().catch(() => {})
+      }
+    } else {
+      audio.pause()
+    }
+  }, [isPlaying, activeSectionId, voiceoverSrc])
+
   if (!activeSegment || !activeClip) {
     return (
       <div className="playback-panel">
@@ -76,9 +128,6 @@ export function PlaybackPanel(): React.ReactNode {
     )
   }
 
-  // Calculate video time from playhead position relative to segment
-  const videoTimeMs = effectivePosition - activeSegment.startTime + activeSegment.sourceOffset
-
   return (
     <div className="playback-panel">
       <VideoPlayer
@@ -86,6 +135,12 @@ export function PlaybackPanel(): React.ReactNode {
         currentTime={videoTimeMs}
         playing={isPlaying}
         playbackRate={playbackRate}
+      />
+      <audio
+        key={voiceoverSrc ?? 'no-voiceover'}
+        ref={audioRef}
+        src={voiceoverSrc ?? undefined}
+        preload="auto"
       />
     </div>
   )
