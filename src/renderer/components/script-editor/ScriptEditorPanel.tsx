@@ -3,6 +3,7 @@ import StarterKit from '@tiptap/starter-kit'
 import { useEffect, useRef } from 'react'
 import type { ScriptSection } from '@shared/types/ai'
 import { useScriptStore } from '../../stores/script-store'
+import { useTimelineStore } from '../../stores/timeline-store'
 
 /**
  * Convert an array of ScriptSection objects to Tiptap-compatible HTML.
@@ -74,6 +75,8 @@ interface ScriptEditorPanelProps {
 
 export function ScriptEditorPanel({ clipId }: ScriptEditorPanelProps): React.ReactNode {
   const { sections, clipScripts, setSections, setClipScript, updateSection } = useScriptStore()
+  const selectedSegmentId = useTimelineStore((s) => s.selectedSegmentId)
+  const timeline = useTimelineStore((s) => s.timeline)
 
   const activeSections = clipId ? (clipScripts[clipId] ?? []) : sections
   const isSyncingRef = useRef(false)
@@ -127,6 +130,32 @@ export function ScriptEditorPanel({ clipId }: ScriptEditorPanelProps): React.Rea
       isSyncingRef.current = false
     }
   }, [activeSections, editor])
+
+  // When a segment is selected in timeline, scroll to the corresponding section header
+  useEffect(() => {
+    if (!editor || !selectedSegmentId || !timeline) return
+
+    // Find the selected segment
+    const segment = timeline.tracks
+      .flatMap((t) => t.segments)
+      .find((s) => s.id === selectedSegmentId)
+    if (!segment?.metadata) return
+
+    try {
+      const meta = JSON.parse(segment.metadata) as { sectionId?: string; sectionOrder?: number }
+      if (meta.sectionOrder == null) return
+
+      // Scroll to the Nth h2 heading in the editor
+      const editorEl = editor.view.dom
+      const headings = editorEl.querySelectorAll('h2')
+      const targetHeading = headings[meta.sectionOrder]
+      if (targetHeading) {
+        targetHeading.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    } catch {
+      // Invalid metadata — ignore
+    }
+  }, [selectedSegmentId, timeline, editor])
 
   return (
     <div className="script-editor-panel">
