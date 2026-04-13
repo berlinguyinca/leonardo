@@ -29,6 +29,8 @@ export interface Segment {
   endTime: number
   sourceFile: string
   sourceOffset: number
+  /** Duration of available source material from sourceOffset — clamp playback here */
+  sourceDuration?: number
   label: string
   metadata?: string
 }

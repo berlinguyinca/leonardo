@@ -186,6 +186,7 @@ function runMigrations(db: Database.Database): void {
   // Idempotent column additions for segments table (added in v5)
   for (const sql of [
     `ALTER TABLE segments ADD COLUMN metadata TEXT DEFAULT NULL`,
+    `ALTER TABLE segments ADD COLUMN source_duration REAL DEFAULT NULL`,
   ]) {
     try { db.exec(sql) } catch { /* column already exists */ }
   }
@@ -434,15 +435,15 @@ export function saveTimeline(timeline: SyncTimeline): void {
     // Insert tracks and segments
     const insertTrack = db.prepare(`INSERT INTO tracks (id, timeline_id, type, z_order, label, muted, locked)
       VALUES (?, ?, ?, ?, ?, ?, ?)`)
-    const insertSegment = db.prepare(`INSERT INTO segments (id, track_id, start_time, end_time, source_file, source_offset, label, metadata)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    const insertSegment = db.prepare(`INSERT INTO segments (id, track_id, start_time, end_time, source_file, source_offset, source_duration, label, metadata)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 
     for (const track of timeline.tracks) {
       insertTrack.run(track.id, timeline.id, track.type, track.zOrder, track.label,
         track.muted ? 1 : 0, track.locked ? 1 : 0)
       for (const seg of track.segments) {
         insertSegment.run(seg.id, track.id, seg.startTime, seg.endTime,
-          seg.sourceFile, seg.sourceOffset, seg.label, seg.metadata ?? null)
+          seg.sourceFile, seg.sourceOffset, seg.sourceDuration ?? null, seg.label, seg.metadata ?? null)
       }
     }
 
@@ -485,6 +486,7 @@ export function getTimeline(projectId: string): SyncTimeline | null {
       endTime: sr.end_time as number,
       sourceFile: sr.source_file as string,
       sourceOffset: sr.source_offset as number,
+      sourceDuration: (sr.source_duration as number) ?? undefined,
       label: sr.label as string,
       metadata: (sr.metadata as string) ?? undefined,
     }))

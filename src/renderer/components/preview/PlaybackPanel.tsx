@@ -88,9 +88,13 @@ export function PlaybackPanel(): React.ReactNode {
 
   // Calculate video time from playhead position relative to segment
   // (computed here so we can use it in the effect below)
-  const videoTimeMs = activeSegment
+  // Clamp to sourceDuration so video freezes on last frame when segment is extended for voiceover
+  const rawVideoTimeMs = activeSegment
     ? effectivePosition - activeSegment.startTime + activeSegment.sourceOffset
     : 0
+  const videoTimeMs = activeSegment?.sourceDuration != null
+    ? Math.min(rawVideoTimeMs, activeSegment.sourceOffset + activeSegment.sourceDuration - 1)
+    : rawVideoTimeMs
 
   // Sync audio with video playback — section-driven, not per-frame
   const lastAudioSectionRef = useRef<string | null>(null)
