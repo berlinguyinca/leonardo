@@ -1,5 +1,7 @@
+import { join } from 'path'
 import { tmpdir } from 'os'
-import { statSync, readFileSync } from 'fs'
+import { statSync, readFileSync, mkdirSync } from 'fs'
+import { randomUUID } from 'crypto'
 import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts'
 import type { ITTSProvider } from '@shared/interfaces/tts-provider'
 import type { VoiceProfile, TTSSynthesisResult, WordTiming } from '@shared/types/tts'
@@ -24,7 +26,10 @@ export class EdgeTTSProvider implements ITTSProvider {
       await tts.setMetadata(voice.voiceId, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3, {
         wordBoundaryEnabled: true,
       })
-      const fileResult = await tts.toFile(tmpdir(), text)
+      // Each call needs a unique directory — msedge-tts writes to a fixed filename (audio.mp3)
+      const outputDir = join(tmpdir(), `leonardo-tts-${Date.now()}-${randomUUID().slice(0, 8)}`)
+      mkdirSync(outputDir, { recursive: true })
+      const fileResult = await tts.toFile(outputDir, text)
       audioFilePath = fileResult.audioFilePath
       metadataFilePath = fileResult.metadataFilePath ?? null
       tts.close()

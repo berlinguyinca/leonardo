@@ -29,6 +29,7 @@ vi.mock('fs', () => ({
   ),
   writeFileSync: vi.fn(),
   existsSync: vi.fn().mockReturnValue(false),
+  mkdirSync: vi.fn(),
 }))
 
 // Mock tts-cache to avoid side effects between tests
