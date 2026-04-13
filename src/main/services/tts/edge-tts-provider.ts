@@ -1,6 +1,6 @@
 import { join } from 'path'
 import { app } from 'electron'
-import { statSync, readFileSync, mkdirSync, existsSync } from 'fs'
+import { statSync, readFileSync, mkdirSync, existsSync, writeFileSync } from 'fs'
 import { randomUUID } from 'crypto'
 import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts'
 import type { ITTSProvider } from '@shared/interfaces/tts-provider'
@@ -58,6 +58,9 @@ export class EdgeTTSProvider implements ITTSProvider {
     // Each call needs a unique directory — msedge-tts writes to a fixed filename (audio.mp3)
     const outputDir = join(getVoiceoverDir(), `tts-${Date.now()}-${randomUUID().slice(0, 8)}`)
     mkdirSync(outputDir, { recursive: true })
+    // Pre-create metadata.json — msedge-tts internally calls unlinkSync on it during
+    // stream close cleanup, which crashes with ENOENT if the file doesn't exist
+    writeFileSync(join(outputDir, 'metadata.json'), '{}', 'utf-8')
 
     let audioFilePath: string
     let metadataFilePath: string | null = null
