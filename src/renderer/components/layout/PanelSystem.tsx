@@ -9,7 +9,8 @@ import { ScriptOnlyView } from '../script-editor/ScriptOnlyView'
 import { InlineEditorView } from '../script-editor/InlineEditorView'
 import { ClipLibrary } from '../clip-library/ClipLibrary'
 import { ComposeView } from '../compose/ComposeView'
-import { ScriptPresetView } from '../script-view/ScriptPresetView'
+import { ScriptTimelineView } from '../script-editor/ScriptTimelineView'
+import { ScriptEditorPanel } from '../script-editor/ScriptEditorPanel'
 import { EffectsCanvas } from '../effects/EffectsCanvas'
 import { Timeline } from '../timeline/Timeline'
 
@@ -72,19 +73,24 @@ export function PanelSystem({ preset }: PanelSystemProps): React.ReactNode {
 
   const effectiveTimelineHeight = timelineCollapsed ? COLLAPSED_SIZE : timelineHeight
 
-  // Script preset: ScriptPresetView owns the entire layout (no sidebar, no properties, no outer timeline)
+  // Script preset: two-column layout — editor left, video + toolbar + log + timeline right
   if (preset === 'script') {
     return (
-      <div className="panel-system">
-        <div className="panel-main" style={{ width: '100%' }}>
-          <div className="panel-top" style={{ height: '100%' }}>
-            <div className="panel panel-preview" style={{ width: '100%' }}>
-              <div className="panel-header">Script</div>
-              <div className="panel-content">
-                <ScriptPresetView />
-              </div>
-            </div>
-          </div>
+      <div className="panel-system script-layout">
+        {/* Left: Script Editor */}
+        <div className="script-left-panel" style={{ width: `${sidebarWidth}px`, minWidth: 250 }}>
+          <ScriptEditorPanel />
+        </div>
+
+        {/* Resizable divider */}
+        <div
+          className="resize-handle resize-handle-v script-split-divider"
+          onMouseDown={handleMouseDown('sidebar')}
+        />
+
+        {/* Right: Video + Toolbar + Generation Log + Compact Timeline */}
+        <div className="script-right-panel" style={{ flex: 1 }}>
+          <ScriptTimelineView />
         </div>
       </div>
     )
@@ -235,6 +241,7 @@ export function PanelSystem({ preset }: PanelSystemProps): React.ReactNode {
           </div>
           {!timelineCollapsed && (
             <div className="panel-content">
+              <Timeline />
               {editorView === 'script-only' && (
                 <ScriptOnlyView sections={sections} onUpdateSection={updateSection} />
               )}
