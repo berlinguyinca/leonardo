@@ -1,4 +1,4 @@
-export type TTSEngineType = 'piper' | 'coqui' | 'elevenlabs'
+export type TTSEngineType = 'piper' | 'coqui' | 'elevenlabs' | 'edge-tts'
 export type TTSQualityTier = 'free' | 'production'
 
 export interface TTSConfig {
@@ -16,8 +16,15 @@ export interface VoiceProfile {
   isDefault: boolean
 }
 
+export interface WordTiming {
+  text: string
+  offsetMs: number
+  durationMs: number
+}
+
 export interface TTSSynthesisResult {
   filePath: string
   duration: number
   sectionId: string
+  wordTimings?: WordTiming[]
 }

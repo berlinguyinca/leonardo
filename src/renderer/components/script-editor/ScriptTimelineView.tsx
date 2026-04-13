@@ -199,7 +199,7 @@ export function ScriptTimelineView(): React.ReactNode {
         }
 
         const textHash = String(section.text.length) + '-' + section.text.slice(0, 20)
-        useScriptStore.getState().setVoiceover(section.id, result.filePath, textHash)
+        useScriptStore.getState().setVoiceover(section.id, result.filePath, textHash, result.wordTimings)
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         console.error(`[TTS] Section ${section.order + 1} failed:`, msg)

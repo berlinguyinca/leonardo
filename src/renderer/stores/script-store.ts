@@ -1,10 +1,12 @@
 import { create } from 'zustand'
 import type { ScriptSection, GenerationLog } from '@shared/types/ai'
+import type { WordTiming } from '@shared/types/tts'
 
 interface VoiceoverEntry {
   filePath: string
   textHash: string
   stale: boolean
+  wordTimings?: WordTiming[]
 }
 
 interface ScriptState {
@@ -22,7 +24,7 @@ interface ScriptState {
   assignEventToSection: (sectionId: string, eventId: string) => void
   removeEventFromSection: (sectionId: string, eventId: string) => void
   setFreezeOverride: (sectionId: string, duration: number | null) => void
-  setVoiceover: (sectionId: string, filePath: string, textHash: string) => void
+  setVoiceover: (sectionId: string, filePath: string, textHash: string, wordTimings?: WordTiming[]) => void
   markVoiceoverStale: (sectionId: string) => void
 }
 
@@ -85,9 +87,9 @@ export const useScriptStore = create<ScriptState>((set, get) => ({
         s.id === sectionId ? { ...s, freezeOverrideDuration: duration } : s,
       ),
     })),
-  setVoiceover: (sectionId, filePath, textHash) =>
+  setVoiceover: (sectionId, filePath, textHash, wordTimings?) =>
     set((state) => ({
-      voiceovers: { ...state.voiceovers, [sectionId]: { filePath, textHash, stale: false } },
+      voiceovers: { ...state.voiceovers, [sectionId]: { filePath, textHash, stale: false, wordTimings } },
     })),
   markVoiceoverStale: (sectionId) =>
     set((state) => {

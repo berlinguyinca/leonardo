@@ -24,6 +24,9 @@ vi.mock('msedge-tts', () => ({
 // Mock fs to avoid actual file system checks
 vi.mock('fs', () => ({
   statSync: vi.fn().mockReturnValue({ size: 1024 }),
+  readFileSync: vi.fn().mockReturnValue(
+    '{"Metadata":[{"Type":"WordBoundary","Data":{"Offset":0,"Duration":3750000,"text":{"Text":"Hello"}}},{"Type":"WordBoundary","Data":{"Offset":5000000,"Duration":3750000,"text":{"Text":"world"}}}]}',
+  ),
   writeFileSync: vi.fn(),
   existsSync: vi.fn().mockReturnValue(false),
 }))
@@ -63,9 +66,9 @@ describe('EdgeTTSProvider', () => {
     // Default: no cache hit
     mockGetCachedResult.mockReturnValue(null)
     mockComputeSectionHash.mockReturnValue('abc123hash')
-    // Default: toFile returns a valid path
+    // Default: toFile returns a valid path and metadata file
     mockSetMetadata.mockResolvedValue(undefined)
-    mockToFile.mockResolvedValue({ audioFilePath: '/tmp/leonardo-tts-123.mp3', metadataFilePath: null })
+    mockToFile.mockResolvedValue({ audioFilePath: '/tmp/leonardo-tts-123.mp3', metadataFilePath: '/tmp/leonardo-tts-123.json' })
   })
 
   describe('name', () => {
@@ -85,7 +88,11 @@ describe('EdgeTTSProvider', () => {
       const voice = makeVoice()
       const result = await provider.synthesize('Hello world', voice)
 
-      expect(mockSetMetadata).toHaveBeenCalledWith('en-US-JennyNeural', 'audio-24khz-48kbitrate-mono-mp3')
+      expect(mockSetMetadata).toHaveBeenCalledWith(
+        'en-US-JennyNeural',
+        'audio-24khz-48kbitrate-mono-mp3',
+        { wordBoundaryEnabled: true },
+      )
       expect(mockToFile).toHaveBeenCalled()
       expect(mockClose).toHaveBeenCalled()
       expect(result).toMatchObject({
@@ -95,7 +102,42 @@ describe('EdgeTTSProvider', () => {
       })
     })
 
-    it('estimates duration from word count (150 wpm)', async () => {
+    it('parses word boundary metadata and returns wordTimings', async () => {
+      const result = await provider.synthesize('Hello world', makeVoice())
+
+      expect(result.wordTimings).toEqual([
+        { text: 'Hello', offsetMs: 0, durationMs: 375 },
+        { text: 'world', offsetMs: 500, durationMs: 375 },
+      ])
+    })
+
+    it('uses actual duration from last word boundary when metadata present', async () => {
+      const result = await provider.synthesize('Hello world', makeVoice())
+      // Last word: offsetMs=500, durationMs=375 → actualDuration=875
+      expect(result.duration).toBe(875)
+    })
+
+    it('falls back to word-count estimate when metadataFilePath is null', async () => {
+      mockToFile.mockResolvedValueOnce({ audioFilePath: '/tmp/leonardo-tts-123.mp3', metadataFilePath: null })
+      // 15 words → 6000ms
+      const text = 'one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen'
+      const result = await provider.synthesize(text, makeVoice())
+      expect(result.duration).toBeCloseTo(6000, -1)
+      expect(result.wordTimings).toEqual([])
+    })
+
+    it('falls back to word-count estimate when metadata parse fails', async () => {
+      const { readFileSync } = await import('fs')
+      ;(readFileSync as ReturnType<typeof vi.fn>).mockReturnValueOnce('not valid json')
+      const text = 'one two three four five'
+      const result = await provider.synthesize(text, makeVoice())
+      // 5 words → 5/150 * 60 * 1000 = 2000ms
+      expect(result.duration).toBeCloseTo(2000, -1)
+      expect(result.wordTimings).toEqual([])
+    })
+
+    it('estimates duration from word count (150 wpm) when no metadata available', async () => {
+      mockToFile.mockResolvedValueOnce({ audioFilePath: '/tmp/leonardo-tts-123.mp3', metadataFilePath: null })
       // 15 words → 15/150 * 60 * 1000 = 6000ms
       const text = 'one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen'
       const result = await provider.synthesize(text, makeVoice())
