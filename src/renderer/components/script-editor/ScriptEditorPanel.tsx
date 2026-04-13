@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import type { ScriptSection } from '@shared/types/ai'
 import { useScriptStore } from '../../stores/script-store'
 import { useTimelineStore } from '../../stores/timeline-store'
+import { usePlayheadHighlight } from '../../hooks/usePlayheadHighlight'
 
 /**
  * Convert an array of ScriptSection objects to Tiptap-compatible HTML.
@@ -119,6 +120,8 @@ export function ScriptEditorPanel({ clipId }: ScriptEditorPanelProps): React.Rea
       }
     },
   })
+
+  usePlayheadHighlight(editor)
 
   // Sync store changes into the editor (e.g., after AI generation)
   useEffect(() => {
