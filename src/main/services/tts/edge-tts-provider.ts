@@ -1,7 +1,6 @@
-import { join } from 'path'
 import { tmpdir } from 'os'
-import { tts as edgeTTS, getVoices as edgeGetVoices } from 'edge-tts'
-import { writeFileSync } from 'fs'
+import { statSync } from 'fs'
+import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts'
 import type { ITTSProvider } from '@shared/interfaces/tts-provider'
 import type { VoiceProfile, TTSSynthesisResult } from '@shared/types/tts'
 import { computeSectionHash, getCachedResult, setCachedResult } from './tts-cache'
@@ -18,29 +17,31 @@ export class EdgeTTSProvider implements ITTSProvider {
     const cached = getCachedResult(hash)
     if (cached) return cached
 
-    const outputPath = join(tmpdir(), `leonardo-tts-${Date.now()}-${voice.voiceId}.mp3`)
-
-    let audioBuffer: Buffer
+    let audioFilePath: string
     try {
-      audioBuffer = await edgeTTS(text, { voice: voice.voiceId })
+      const tts = new MsEdgeTTS()
+      await tts.setMetadata(voice.voiceId, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3)
+      const result = await tts.toFile(tmpdir(), text)
+      audioFilePath = result.audioFilePath
+      tts.close()
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       throw new Error(`Edge TTS synthesis failed: ${message}`)
     }
 
-    if (audioBuffer.length === 0) {
-      throw new Error('Edge TTS returned empty audio buffer — synthesis produced no output')
+    const fileSize = statSync(audioFilePath).size
+    if (fileSize === 0) {
+      throw new Error('Edge TTS returned empty audio file — synthesis produced no output')
     }
 
-    writeFileSync(outputPath, audioBuffer)
-    console.log(`[TTS] Wrote ${audioBuffer.length} bytes to ${outputPath}`)
+    console.log(`[TTS] Wrote ${fileSize} bytes to ${audioFilePath}`)
 
     // Estimate duration from text (150 words per minute)
     const wordCount = text.split(/\s+/).length
     const estimatedDuration = (wordCount / 150) * 60 * 1000
 
     const result: TTSSynthesisResult = {
-      filePath: outputPath,
+      filePath: audioFilePath,
       duration: estimatedDuration,
       sectionId: '',
     }
@@ -49,7 +50,8 @@ export class EdgeTTSProvider implements ITTSProvider {
   }
 
   async getVoices(): Promise<VoiceProfile[]> {
-    const voices = await edgeGetVoices()
+    const tts = new MsEdgeTTS()
+    const voices = await tts.getVoices()
     return voices.map((v) => ({
       id: v.ShortName,
       name: v.FriendlyName,
@@ -62,7 +64,8 @@ export class EdgeTTSProvider implements ITTSProvider {
 
   async testConnection(): Promise<boolean> {
     try {
-      await edgeGetVoices()
+      const tts = new MsEdgeTTS()
+      await tts.getVoices()
       return true
     } catch {
       return false

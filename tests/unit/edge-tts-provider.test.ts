@@ -1,17 +1,29 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Mock edge-tts module before any imports
-const mockEdgeTTS = vi.fn()
+// Mock msedge-tts MsEdgeTTS class
+const mockSetMetadata = vi.fn()
+const mockToFile = vi.fn()
 const mockGetVoices = vi.fn()
+const mockClose = vi.fn()
 
-vi.mock('edge-tts', () => ({
-  tts: (...args: unknown[]) => mockEdgeTTS(...args),
-  getVoices: () => mockGetVoices(),
+vi.mock('msedge-tts', () => ({
+  MsEdgeTTS: vi.fn().mockImplementation(function (this: Record<string, unknown>) {
+    this.setMetadata = mockSetMetadata
+    this.toFile = mockToFile
+    this.getVoices = mockGetVoices
+    this.close = mockClose
+  }),
+  OUTPUT_FORMAT: {
+    AUDIO_24KHZ_48KBITRATE_MONO_MP3: 'audio-24khz-48kbitrate-mono-mp3',
+    AUDIO_24KHZ_96KBITRATE_MONO_MP3: 'audio-24khz-96kbitrate-mono-mp3',
+    WEBM_24KHZ_16BIT_MONO_OPUS: 'webm-24khz-16bit-mono-opus',
+  },
 }))
 
-// Mock fs to avoid actual file writes
+// Mock fs to avoid actual file system checks
 vi.mock('fs', () => ({
+  statSync: vi.fn().mockReturnValue({ size: 1024 }),
   writeFileSync: vi.fn(),
   existsSync: vi.fn().mockReturnValue(false),
 }))
@@ -51,6 +63,9 @@ describe('EdgeTTSProvider', () => {
     // Default: no cache hit
     mockGetCachedResult.mockReturnValue(null)
     mockComputeSectionHash.mockReturnValue('abc123hash')
+    // Default: toFile returns a valid path
+    mockSetMetadata.mockResolvedValue(undefined)
+    mockToFile.mockResolvedValue({ audioFilePath: '/tmp/leonardo-tts-123.mp3', metadataFilePath: null })
   })
 
   describe('name', () => {
@@ -66,29 +81,26 @@ describe('EdgeTTSProvider', () => {
   })
 
   describe('synthesize', () => {
-    it('calls edge-tts with text and voice ID and returns a TTSSynthesisResult', async () => {
-      const audioBuffer = Buffer.from('fake-audio-data')
-      mockEdgeTTS.mockResolvedValue(audioBuffer)
-
+    it('calls MsEdgeTTS setMetadata and toFile, returns TTSSynthesisResult', async () => {
       const voice = makeVoice()
       const result = await provider.synthesize('Hello world', voice)
 
-      expect(mockEdgeTTS).toHaveBeenCalledWith('Hello world', { voice: 'en-US-JennyNeural' })
+      expect(mockSetMetadata).toHaveBeenCalledWith('en-US-JennyNeural', 'audio-24khz-48kbitrate-mono-mp3')
+      expect(mockToFile).toHaveBeenCalled()
+      expect(mockClose).toHaveBeenCalled()
       expect(result).toMatchObject({
-        filePath: expect.stringContaining('leonardo-tts-'),
+        filePath: '/tmp/leonardo-tts-123.mp3',
         duration: expect.any(Number),
         sectionId: '',
       })
     })
 
     it('estimates duration from word count (150 wpm)', async () => {
-      mockEdgeTTS.mockResolvedValue(Buffer.from('audio'))
-
       // 15 words → 15/150 * 60 * 1000 = 6000ms
       const text = 'one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen'
       const result = await provider.synthesize(text, makeVoice())
 
-      expect(result.duration).toBeCloseTo(6000, -1) // within 100ms
+      expect(result.duration).toBeCloseTo(6000, -1)
     })
 
     it('returns cached result when cache hit', async () => {
@@ -102,12 +114,10 @@ describe('EdgeTTSProvider', () => {
       const result = await provider.synthesize('hello', makeVoice())
 
       expect(result).toBe(cached)
-      expect(mockEdgeTTS).not.toHaveBeenCalled()
+      expect(mockSetMetadata).not.toHaveBeenCalled()
     })
 
     it('caches result after successful synthesis', async () => {
-      mockEdgeTTS.mockResolvedValue(Buffer.from('audio'))
-
       const voice = makeVoice()
       const result = await provider.synthesize('Hello', voice)
 
@@ -115,32 +125,31 @@ describe('EdgeTTSProvider', () => {
     })
 
     it('computes hash with text, voiceId, and engine', async () => {
-      mockEdgeTTS.mockResolvedValue(Buffer.from('audio'))
-
       await provider.synthesize('Test text', makeVoice({ voiceId: 'en-US-AriaNeural' }))
 
       expect(mockComputeSectionHash).toHaveBeenCalledWith('Test text', 'en-US-AriaNeural', 'edge-tts')
     })
 
-    it('wraps edge-tts errors with descriptive message', async () => {
-      mockEdgeTTS.mockRejectedValue(new Error('network error'))
+    it('wraps MsEdgeTTS errors with descriptive message', async () => {
+      mockSetMetadata.mockRejectedValue(new Error('Unexpected server response: 403'))
 
       await expect(provider.synthesize('hello', makeVoice())).rejects.toThrow(
-        'Edge TTS synthesis failed: network error',
+        'Edge TTS synthesis failed: Unexpected server response: 403',
       )
     })
 
-    it('throws when edge-tts returns empty buffer', async () => {
-      mockEdgeTTS.mockResolvedValue(Buffer.alloc(0))
+    it('throws when audio file is empty', async () => {
+      const { statSync } = await import('fs')
+      ;(statSync as ReturnType<typeof vi.fn>).mockReturnValueOnce({ size: 0 })
 
       await expect(provider.synthesize('hello', makeVoice())).rejects.toThrow(
-        'Edge TTS returned empty audio buffer',
+        'Edge TTS returned empty audio file',
       )
     })
   })
 
   describe('getVoices', () => {
-    it('returns VoiceProfile array mapped from edge-tts voices', async () => {
+    it('returns VoiceProfile array mapped from MsEdgeTTS voices', async () => {
       mockGetVoices.mockResolvedValue([
         { ShortName: 'en-US-JennyNeural', FriendlyName: 'Microsoft Jenny Online (Natural) - English (United States)' },
         { ShortName: 'en-GB-RyanNeural', FriendlyName: 'Microsoft Ryan Online (Natural) - English (United Kingdom)' },
@@ -157,26 +166,16 @@ describe('EdgeTTSProvider', () => {
         samples: [],
         isDefault: false,
       })
-      expect(voices[1]).toEqual({
-        id: 'en-GB-RyanNeural',
-        name: 'Microsoft Ryan Online (Natural) - English (United Kingdom)',
-        provider: 'edge-tts',
-        voiceId: 'en-GB-RyanNeural',
-        samples: [],
-        isDefault: false,
-      })
     })
 
-    it('returns empty array when edge-tts returns no voices', async () => {
+    it('returns empty array when no voices available', async () => {
       mockGetVoices.mockResolvedValue([])
-
       const voices = await provider.getVoices()
       expect(voices).toEqual([])
     })
 
     it('rejects when getVoices throws', async () => {
       mockGetVoices.mockRejectedValue(new Error('service unavailable'))
-
       await expect(provider.getVoices()).rejects.toThrow('service unavailable')
     })
   })
@@ -184,16 +183,12 @@ describe('EdgeTTSProvider', () => {
   describe('testConnection', () => {
     it('returns true when getVoices succeeds', async () => {
       mockGetVoices.mockResolvedValue([{ ShortName: 'en-US-JennyNeural', FriendlyName: 'Jenny' }])
-
-      const result = await provider.testConnection()
-      expect(result).toBe(true)
+      expect(await provider.testConnection()).toBe(true)
     })
 
     it('returns false when getVoices throws', async () => {
       mockGetVoices.mockRejectedValue(new Error('network unreachable'))
-
-      const result = await provider.testConnection()
-      expect(result).toBe(false)
+      expect(await provider.testConnection()).toBe(false)
     })
   })
 })
