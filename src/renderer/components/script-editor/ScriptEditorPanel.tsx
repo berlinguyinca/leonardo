@@ -5,6 +5,7 @@ import type { ScriptSection } from '@shared/types/ai'
 import { useScriptStore } from '../../stores/script-store'
 import { useTimelineStore } from '../../stores/timeline-store'
 import { usePlayheadHighlight } from '../../hooks/usePlayheadHighlight'
+import { useToastStore } from '../../stores/toast-store'
 
 /**
  * Convert an array of ScriptSection objects to Tiptap-compatible HTML.
@@ -75,12 +76,29 @@ interface ScriptEditorPanelProps {
 }
 
 export function ScriptEditorPanel({ clipId }: ScriptEditorPanelProps): React.ReactNode {
-  const { sections, clipScripts, setSections, setClipScript, updateSection } = useScriptStore()
+  const { sections, clipScripts, setSections, setClipScript, updateSection, removeClipScript } = useScriptStore()
   const selectedSegmentId = useTimelineStore((s) => s.selectedSegmentId)
   const timeline = useTimelineStore((s) => s.timeline)
+  const addToast = useToastStore((s) => s.addToast)
 
   const activeSections = clipId ? (clipScripts[clipId] ?? []) : sections
   const isSyncingRef = useRef(false)
+
+  const handleClearScript = async () => {
+    const activeClipId = clipId ?? Object.keys(clipScripts)[0]
+    if (activeClipId && window.leonardo?.script?.delete) {
+      try {
+        await window.leonardo.script.delete(activeClipId)
+      } catch (err) {
+        console.error('[ScriptEditor] Failed to delete script from DB:', err)
+      }
+    }
+    if (activeClipId) {
+      removeClipScript(activeClipId)
+    }
+    setSections([])
+    addToast('Script cleared', 'info')
+  }
 
   const editor = useEditor({
     extensions: [StarterKit.configure({ heading: { levels: [2] } })],
@@ -162,7 +180,18 @@ export function ScriptEditorPanel({ clipId }: ScriptEditorPanelProps): React.Rea
 
   return (
     <div className="script-editor-panel">
-      <div className="script-editor-panel-header">Script Editor</div>
+      <div className="script-editor-panel-header">
+        <span>Script Editor</span>
+        {activeSections.length > 0 && (
+          <button
+            className="rec-btn"
+            style={{ marginLeft: 'auto', fontSize: 10, padding: '1px 6px' }}
+            onClick={handleClearScript}
+          >
+            Clear
+          </button>
+        )}
+      </div>
       <div className="tiptap-editor-wrapper">
         <EditorContent editor={editor} className="tiptap-editor" />
       </div>

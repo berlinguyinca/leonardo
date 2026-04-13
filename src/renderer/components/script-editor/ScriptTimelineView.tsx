@@ -6,6 +6,7 @@ import { useTimelineStore } from '../../stores/timeline-store'
 import { useLibraryStore } from '../../stores/library-store'
 import { useScriptStore } from '../../stores/script-store'
 import { useProjectStore } from '../../stores/project-store'
+import { useToastStore } from '../../stores/toast-store'
 import type { VoiceProfile } from '@shared/types/tts'
 import type { TTSEngineType } from '@shared/types/tts'
 
@@ -19,6 +20,7 @@ export function ScriptTimelineView(): React.ReactNode {
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
   const generationLog = useScriptStore((s) => s.generationLog)
   const setGenerationLog = useScriptStore((s) => s.setGenerationLog)
+  const addToast = useToastStore((s) => s.addToast)
 
   useEffect(() => {
     if (!window.leonardo?.tts?.listVoices) return
@@ -86,11 +88,15 @@ export function ScriptTimelineView(): React.ReactNode {
           useTimelineStore.getState().splitClipBySections(firstClipSegment.id, result.script.sections)
         }
       }
+      if (!result.success) {
+        addToast(result.error ?? 'Script generation failed', 'error')
+      }
       if (result.generationLog) {
         setGenerationLog(result.generationLog)
       }
     } catch (err) {
       console.error('[ScriptTimelineView] Script generation failed:', err)
+      addToast(err instanceof Error ? err.message : 'Script generation failed', 'error')
     } finally {
       setGenerating(false)
     }
@@ -129,11 +135,15 @@ export function ScriptTimelineView(): React.ReactNode {
         useScriptStore.getState().setSections(result.script.sections)
         useScriptStore.getState().setClipScript(clip.id, result.script.sections)
       }
+      if (!result.success) {
+        addToast(result.error ?? 'Script regeneration failed', 'error')
+      }
       if (result.generationLog) {
         setGenerationLog(result.generationLog)
       }
     } catch (err) {
       console.error('[ScriptTimelineView] Regeneration failed:', err)
+      addToast(err instanceof Error ? err.message : 'Script regeneration failed', 'error')
     } finally {
       setGenerating(false)
     }
@@ -141,7 +151,13 @@ export function ScriptTimelineView(): React.ReactNode {
 
   const handleGenerateVoiceovers = async () => {
     if (!window.leonardo?.tts?.synthesize) return
-    const sections = useScriptStore.getState().sections
+
+    // Fall back to clipScripts when sections is empty (e.g., after project reload)
+    const storeSections = useScriptStore.getState().sections
+    const clipScriptsMap = useScriptStore.getState().clipScripts
+    const sections = storeSections.length > 0
+      ? storeSections
+      : Object.values(clipScriptsMap).flat()
     if (sections.length === 0) return
 
     setGeneratingTTS(true)
@@ -154,15 +170,16 @@ export function ScriptTimelineView(): React.ReactNode {
       isDefault: true,
     }
 
-    try {
-      const timeline = useTimelineStore.getState().timeline
-      if (!timeline) return
+    const timeline = useTimelineStore.getState().timeline
+    if (!timeline) { setGeneratingTTS(false); return }
 
-      const clipSegments = timeline.tracks
-        .filter((t) => t.type === 'clip' || t.type === 'recording')
-        .flatMap((t) => t.segments)
+    const clipSegments = timeline.tracks
+      .filter((t) => t.type === 'clip' || t.type === 'recording')
+      .flatMap((t) => t.segments)
 
-      for (const section of sections) {
+    const errors: string[] = []
+    for (const section of sections) {
+      try {
         const segment = clipSegments.find((s) => {
           if (!s.metadata) return false
           try {
@@ -181,15 +198,20 @@ export function ScriptTimelineView(): React.ReactNode {
           useTimelineStore.getState().adjustSegmentDuration(segment.id, result.duration)
         }
 
-        // Compute a simple text hash for staleness tracking
         const textHash = String(section.text.length) + '-' + section.text.slice(0, 20)
         useScriptStore.getState().setVoiceover(section.id, result.filePath, textHash)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error(`[TTS] Section ${section.order + 1} failed:`, msg)
+        errors.push(`Section ${section.order + 1}: ${msg}`)
       }
-    } catch (err) {
-      console.error('[TTS] Voiceover generation failed:', err)
-    } finally {
-      setGeneratingTTS(false)
     }
+
+    if (errors.length > 0) {
+      addToast(`Voiceover failed for ${errors.length} section(s)`, 'error')
+    }
+
+    setGeneratingTTS(false)
   }
 
   return (
