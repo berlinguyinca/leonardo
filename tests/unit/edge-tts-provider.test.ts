@@ -1,6 +1,11 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+// Mock electron app module
+vi.mock("electron", () => ({
+  app: { getPath: () => "/tmp/test-userData" },
+}))
+
 // Mock msedge-tts MsEdgeTTS class
 const mockSetMetadata = vi.fn()
 const mockToFile = vi.fn()
@@ -28,7 +33,7 @@ vi.mock('fs', () => ({
     '{"Metadata":[{"Type":"WordBoundary","Data":{"Offset":0,"Duration":3750000,"text":{"Text":"Hello"}}},{"Type":"WordBoundary","Data":{"Offset":5000000,"Duration":3750000,"text":{"Text":"world"}}}]}',
   ),
   writeFileSync: vi.fn(),
-  existsSync: vi.fn().mockReturnValue(false),
+  existsSync: vi.fn().mockReturnValue(true),
   mkdirSync: vi.fn(),
 }))
 
