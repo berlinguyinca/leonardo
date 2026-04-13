@@ -9,8 +9,11 @@ interface VideoPlayerProps {
 
 export function VideoPlayer({ src, currentTime, playing, playbackRate }: VideoPlayerProps): React.ReactNode {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const readyRef = useRef(false)
+  const [ready, setReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Track the src that was actually loaded — guards against stale ready state
+  // when src changes before new loadeddata fires
+  const loadedSrcRef = useRef<string>('')
 
   // Keep prop values in refs so the loadeddata handler always has current values
   const currentTimeRef = useRef(currentTime)
@@ -23,7 +26,7 @@ export function VideoPlayer({ src, currentTime, playing, playbackRate }: VideoPl
   // When src changes, video reloads — mark not ready, clear any previous error
   useEffect(() => {
     setError(null)
-    readyRef.current = false
+    setReady(false)
   }, [src])
 
   const handleError = useCallback(() => {
@@ -35,9 +38,12 @@ export function VideoPlayer({ src, currentTime, playing, playbackRate }: VideoPl
 
   // Apply pending play/seek when video data has loaded
   const handleLoadedData = useCallback(() => {
-    readyRef.current = true
     const video = videoRef.current
     if (!video) return
+    // Record which src (prop value) just finished loading so the play/pause
+    // effect can distinguish "ready for current src" from "ready for a stale src"
+    loadedSrcRef.current = src
+    setReady(true)
 
     video.playbackRate = playbackRateRef.current
 
@@ -46,23 +52,19 @@ export function VideoPlayer({ src, currentTime, playing, playbackRate }: VideoPl
     if (Math.abs(video.currentTime - timeSec) > 0.05) {
       video.currentTime = timeSec
     }
+    // Play is handled by the play/pause effect which re-runs when ready flips to true
+  }, [src])
 
-    // Apply pending play
-    if (playingRef.current) {
-      video.play().catch((e) => console.warn('[VideoPlayer] play failed on loadeddata:', e))
-    }
-  }, [])
-
-  // Sync play/pause state — only when video is ready
+  // Sync play/pause state — only when video is ready for the current src
   useEffect(() => {
     const video = videoRef.current
-    if (!video || !readyRef.current) return
+    if (!video || !ready || loadedSrcRef.current !== src) return
     if (playing) {
       video.play().catch((e) => console.warn('[VideoPlayer] play failed:', e))
     } else {
       video.pause()
     }
-  }, [playing, src])
+  }, [playing, src, ready])
 
   // Sync playback rate
   useEffect(() => {
@@ -71,16 +73,16 @@ export function VideoPlayer({ src, currentTime, playing, playbackRate }: VideoPl
     video.playbackRate = playbackRate
   }, [playbackRate])
 
-  // Sync seek position — only when paused and video is ready.
+  // Sync seek position — only when paused and video is ready for the current src.
   // No debounce: arrow key frame stepping needs every seek to land immediately.
   useEffect(() => {
     const video = videoRef.current
-    if (!video || playing || !readyRef.current) return
+    if (!video || playing || !ready || loadedSrcRef.current !== src) return
     const timeSec = currentTime / 1000
     if (Math.abs(video.currentTime - timeSec) > 0.05) {
       video.currentTime = timeSec
     }
-  }, [currentTime, playing])
+  }, [currentTime, playing, ready])
 
   if (error) {
     return <div className="playback-video playback-error">{error}</div>
