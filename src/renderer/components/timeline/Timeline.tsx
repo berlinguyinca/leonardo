@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { useTimelineStore } from '../../stores/timeline-store'
 import { useLibraryStore } from '../../stores/library-store'
+import { useUIStore } from '../../stores/ui-store'
 import { usePlayhead } from '../../hooks/usePlayhead'
 import { useTimelineZoom } from '../../hooks/useTimelineZoom'
 import { playheadEmitter } from '../../hooks/PlayheadEmitter'
@@ -11,6 +12,7 @@ import { TrackLane } from './TrackLane'
 import { ScrollContainer } from './ScrollContainer'
 import { ZoomControls } from './ZoomControls'
 import { TransportControls } from './TransportControls'
+import { ScriptTextTrack } from './ScriptTextTrack'
 
 const FRAME_MS = Math.round(1000 / 15) // 1 frame at 15fps capture rate
 
@@ -76,6 +78,7 @@ function jumpSegmentBoundary(dir: 'prev' | 'next'): void {
 export function Timeline(): React.ReactNode {
   const timeline = useTimelineStore((s) => s.timeline)
   const zoomLevel = useTimelineStore((s) => s.zoomLevel)
+  const workspacePreset = useUIStore((s) => s.workspacePreset)
   const containerRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [scrollOffset, setScrollOffset] = useState(0)
@@ -246,6 +249,9 @@ export function Timeline(): React.ReactNode {
             onSeek={seekTo}
           />
         ))}
+        {workspacePreset !== 'script' && (
+          <ScriptTextTrack zoomLevel={zoomLevel} scrollLeft={scrollOffset} />
+        )}
       </ScrollContainer>
     </div>
   )
