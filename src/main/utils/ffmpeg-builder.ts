@@ -191,11 +191,27 @@ export function buildDrawtextFilters(
       parts.push(`boxborderw=10`)
     }
 
-    // Fade in alpha expression for transitions
-    if (el.transitionIn === 'fade' && el.transitionDuration > 0) {
-      const fadeDur = el.transitionDuration / 1000
-      const fadeInExpr = `if(lt(t-${startSec.toFixed(3)},${fadeDur.toFixed(3)}),(t-${startSec.toFixed(3)})/${fadeDur.toFixed(3)},1)`
-      parts.push(`alpha='${fadeInExpr}'`)
+    // Alpha fade expressions for transitions.
+    // v1 limitation: slide and typewriter transitions are not yet reflected in alpha.
+    const hasFadeIn = el.transitionIn === 'fade' && el.transitionDuration > 0
+    const hasFadeOut = el.transitionOut === 'fade' && el.transitionDuration > 0
+    if (hasFadeIn || hasFadeOut) {
+      const fadeDur = (el.transitionDuration / 1000).toFixed(3)
+      const start = startSec.toFixed(3)
+      const end = endSec.toFixed(3)
+      let alphaExpr: string
+      if (hasFadeIn && hasFadeOut) {
+        // Fade in at start, fade out at end — take the minimum of both ramps
+        const fadeInRamp = `if(lt(t-${start},${fadeDur}),(t-${start})/${fadeDur},1)`
+        const fadeOutRamp = `if(gt(t,${end}-${fadeDur}),(${end}-t)/${fadeDur},1)`
+        alphaExpr = `min(${fadeInRamp},${fadeOutRamp})`
+      } else if (hasFadeIn) {
+        alphaExpr = `if(lt(t-${start},${fadeDur}),(t-${start})/${fadeDur},1)`
+      } else {
+        // hasFadeOut only
+        alphaExpr = `if(gt(t,${end}-${fadeDur}),(${end}-t)/${fadeDur},1)`
+      }
+      parts.push(`alpha='${alphaExpr}'`)
     }
 
     filters.push(`drawtext=${parts.join(':')}`)

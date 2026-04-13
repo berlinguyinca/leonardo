@@ -25,13 +25,16 @@ export function PropertiesPanel(): React.ReactNode {
   const setFollowPlayhead = useUIStore((s) => s.setFollowPlayhead)
 
   const prevSegmentIdRef = useRef<string | null>(null)
+  const timelineRef = useRef(timeline)
+  timelineRef.current = timeline
 
   useEffect(() => {
     if (!followPlayhead || !isPlaying || !timeline) return
 
     function onPosition(position: number) {
-      if (!timeline) return
-      const segId = findVideoSegmentAt(timeline, position)
+      const tl = timelineRef.current
+      if (!tl) return
+      const segId = findVideoSegmentAt(tl, position)
       if (segId !== prevSegmentIdRef.current) {
         prevSegmentIdRef.current = segId
         setSelectedSegment(segId)
@@ -42,7 +45,7 @@ export function PropertiesPanel(): React.ReactNode {
     return () => {
       playheadEmitter.off('position', onPosition)
     }
-  }, [followPlayhead, isPlaying, timeline, setSelectedSegment])
+  }, [followPlayhead, isPlaying, setSelectedSegment])
 
   if (!timeline) {
     return <p className="panel-placeholder">No timeline loaded</p>

@@ -182,6 +182,43 @@ describe('buildDrawtextFilters', () => {
     expect(filters[0]).not.toContain('alpha=')
   })
 
+  it('generates alpha expression for fade-out transition', () => {
+    const seg = makeOverlaySegment({
+      startTime: 2000,
+      endTime: 7000,
+      meta: { transitionIn: 'none', transitionOut: 'fade', transitionDuration: 500 },
+    })
+    const filters = buildDrawtextFilters([seg], 1920, 1080)
+
+    expect(filters[0]).toContain('alpha=')
+    // Fade-out ramp: alpha decreases when t > end - fadeDur
+    expect(filters[0]).toContain('if(gt(t,7.000-0.500),(7.000-t)/0.500,1)')
+  })
+
+  it('generates combined alpha for fade-in and fade-out', () => {
+    const seg = makeOverlaySegment({
+      startTime: 2000,
+      endTime: 7000,
+      meta: { transitionIn: 'fade', transitionOut: 'fade', transitionDuration: 500 },
+    })
+    const filters = buildDrawtextFilters([seg], 1920, 1080)
+
+    expect(filters[0]).toContain('alpha=')
+    // Combined: min() wraps both ramps
+    expect(filters[0]).toContain('min(')
+    expect(filters[0]).toContain('if(lt(t-2.000,0.500)')
+    expect(filters[0]).toContain('if(gt(t,7.000-0.500),(7.000-t)/0.500,1)')
+  })
+
+  it('does not add alpha for non-fade transitionOut', () => {
+    const seg = makeOverlaySegment({
+      meta: { transitionIn: 'none', transitionOut: 'slide-left', transitionDuration: 500 },
+    })
+    const filters = buildDrawtextFilters([seg], 1920, 1080)
+
+    expect(filters[0]).not.toContain('alpha=')
+  })
+
   it('handles multiple overlay segments producing multiple filters', () => {
     const seg1 = makeOverlaySegment({ id: 'seg-1', meta: { text: 'First' } })
     const seg2 = makeOverlaySegment({ id: 'seg-2', meta: { text: 'Second' }, startTime: 6000, endTime: 10000 })

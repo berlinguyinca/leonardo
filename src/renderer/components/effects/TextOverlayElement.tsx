@@ -9,12 +9,25 @@ interface TextOverlayElementProps {
   isSelected: boolean
 }
 
+type ResizeCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+
+interface ResizeStart {
+  clientX: number
+  clientY: number
+  elemX: number
+  elemY: number
+  elemWidth: number
+  elemHeight: number
+  corner: ResizeCorner
+}
+
 export function TextOverlayElement({ element, segmentId, isSelected }: TextOverlayElementProps): React.ReactNode {
   const setSelectedElement = useOverlayEditorStore((s) => s.setSelectedElement)
   const updateSegmentMetadata = useTimelineStore((s) => s.updateSegmentMetadata)
 
   const dragStartRef = useRef<{ x: number; y: number; elemX: number; elemY: number } | null>(null)
   const isDraggingRef = useRef(false)
+  const resizeStartRef = useRef<ResizeStart | null>(null)
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     e.stopPropagation()
@@ -50,6 +63,65 @@ export function TextOverlayElement({ element, segmentId, isSelected }: TextOverl
     isDraggingRef.current = false
   }, [])
 
+  const handleResizePointerDown = useCallback((corner: ResizeCorner) => (e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation()
+    setSelectedElement(element.id)
+    resizeStartRef.current = {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      elemX: element.x,
+      elemY: element.y,
+      elemWidth: element.width,
+      elemHeight: element.height,
+      corner,
+    }
+    ;(e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId)
+  }, [element.id, element.x, element.y, element.width, element.height, setSelectedElement])
+
+  const handleResizePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!resizeStartRef.current) return
+    const container = (e.currentTarget as HTMLDivElement).closest('[data-overlay-canvas]') as HTMLElement | null
+    if (!container) return
+
+    const rect = container.getBoundingClientRect()
+    const dx = ((e.clientX - resizeStartRef.current.clientX) / rect.width) * 100
+    const dy = ((e.clientY - resizeStartRef.current.clientY) / rect.height) * 100
+    const { elemX, elemY, elemWidth, elemHeight, corner } = resizeStartRef.current
+
+    let newX = elemX
+    let newY = elemY
+    let newWidth = elemWidth
+    let newHeight = elemHeight
+
+    if (corner === 'bottom-right') {
+      newWidth = Math.max(10, elemWidth + dx)
+      newHeight = Math.max(5, elemHeight + dy)
+    } else if (corner === 'bottom-left') {
+      newWidth = Math.max(10, elemWidth - dx)
+      newHeight = Math.max(5, elemHeight + dy)
+      newX = elemX + (elemWidth - newWidth)
+    } else if (corner === 'top-right') {
+      newWidth = Math.max(10, elemWidth + dx)
+      newHeight = Math.max(5, elemHeight - dy)
+      newY = elemY + (elemHeight - newHeight)
+    } else {
+      // top-left
+      newWidth = Math.max(10, elemWidth - dx)
+      newHeight = Math.max(5, elemHeight - dy)
+      newX = elemX + (elemWidth - newWidth)
+      newY = elemY + (elemHeight - newHeight)
+    }
+
+    const updatedElement = { ...element, x: newX, y: newY, width: newWidth, height: newHeight }
+    updateSegmentMetadata(segmentId, JSON.stringify({ element: updatedElement }))
+  }, [element, segmentId, updateSegmentMetadata])
+
+  const handleResizePointerUp = useCallback(() => {
+    if (!resizeStartRef.current) return
+    resizeStartRef.current = null
+    // Persist final state — updateSegmentMetadata called on last move already persisted it
+  }, [])
+
   const style: React.CSSProperties = {
     position: 'absolute',
     left: `${element.x}%`,
@@ -73,6 +145,17 @@ export function TextOverlayElement({ element, segmentId, isSelected }: TextOverl
     outlineOffset: '2px',
   }
 
+  const gripStyle = (cursor: string, pos: React.CSSProperties): React.CSSProperties => ({
+    position: 'absolute',
+    width: 8,
+    height: 8,
+    background: '#3b82f6',
+    border: '1px solid #fff',
+    borderRadius: 1,
+    cursor,
+    ...pos,
+  })
+
   return (
     <div
       style={style}
@@ -81,6 +164,38 @@ export function TextOverlayElement({ element, segmentId, isSelected }: TextOverl
       onPointerUp={handlePointerUp}
     >
       {element.text}
+      {isSelected && (
+        <>
+          <div
+            data-resize-corner="top-left"
+            style={gripStyle('nw-resize', { top: -5, left: -5 })}
+            onPointerDown={handleResizePointerDown('top-left')}
+            onPointerMove={handleResizePointerMove}
+            onPointerUp={handleResizePointerUp}
+          />
+          <div
+            data-resize-corner="top-right"
+            style={gripStyle('ne-resize', { top: -5, right: -5 })}
+            onPointerDown={handleResizePointerDown('top-right')}
+            onPointerMove={handleResizePointerMove}
+            onPointerUp={handleResizePointerUp}
+          />
+          <div
+            data-resize-corner="bottom-left"
+            style={gripStyle('sw-resize', { bottom: -5, left: -5 })}
+            onPointerDown={handleResizePointerDown('bottom-left')}
+            onPointerMove={handleResizePointerMove}
+            onPointerUp={handleResizePointerUp}
+          />
+          <div
+            data-resize-corner="bottom-right"
+            style={gripStyle('se-resize', { bottom: -5, right: -5 })}
+            onPointerDown={handleResizePointerDown('bottom-right')}
+            onPointerMove={handleResizePointerMove}
+            onPointerUp={handleResizePointerUp}
+          />
+        </>
+      )}
     </div>
   )
 }
