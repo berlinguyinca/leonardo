@@ -199,7 +199,7 @@ export function ScriptTimelineView(): React.ReactNode {
       style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}
     >
       {/* Top: Video Preview — takes remaining space */}
-      <div className="script-preview-section" style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      <div className="script-preview-section" style={{ flex: 1, minHeight: 120, overflow: 'hidden' }}>
         <PlaybackPanel />
       </div>
 
