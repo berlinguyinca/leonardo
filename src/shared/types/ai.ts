@@ -64,3 +64,11 @@ export interface TimingMarker {
   selector?: string
   transitionType?: string
 }
+
+export interface GenerationLog {
+  systemPrompt: string
+  userMessage: string
+  rawResponse: string
+  timestamp: string
+  provider: AIProviderType
+}

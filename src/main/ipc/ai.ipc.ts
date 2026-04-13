@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import { IPC_CHANNELS } from '@shared/constants'
-import type { AIBackendConfig, ScriptGenContext, Script, ScriptSection } from '@shared/types/ai'
+import type { AIBackendConfig, ScriptGenContext, Script, ScriptSection, GenerationLog } from '@shared/types/ai'
+import { getSystemPrompt, buildScriptPrompt } from '../services/ai/prompt-templates'
 import type { DOMEvent } from '@shared/types/events'
 import type { SyncPoint } from '@shared/types/timeline'
 import { createAIProvider } from '../services/ai'
@@ -19,16 +20,31 @@ export function registerAIIPC(): void {
         projectId: string
         clipId?: string
       },
-    ): Promise<{ success: boolean; script?: Script; error?: string }> => {
+    ): Promise<{ success: boolean; script?: Script; generationLog?: GenerationLog; error?: string }> => {
       try {
         assertTrustedIPCEvent(event)
+        console.log(`[AI] Generating script: provider=${args.config.provider} model=${args.config.model ?? 'default'} prompt="${args.prompt.slice(0, 100)}..."`)
         const provider = createAIProvider(args.config)
+        const systemPrompt = getSystemPrompt()
+        const userMessage = `${args.prompt}\n\n${buildScriptPrompt(args.context)}`
         const script = await provider.generateScript(args.prompt, args.context)
         script.projectId = args.projectId
         const saved = saveScript(script, args.clipId)
-        return { success: true, script: saved }
+        const generationLog: GenerationLog = {
+          systemPrompt,
+          userMessage,
+          rawResponse: saved.sections.map((s, i) => `${i + 1}. ${s.text}`).join('\n\n'),
+          timestamp: new Date().toISOString(),
+          provider: args.config.provider,
+        }
+        console.log(`[AI] Script generated: ${saved.sections.length} sections`)
+        return { success: true, script: saved, generationLog }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err)
+        console.error(`[AI] Script generation failed: ${errorMessage}`)
+        if (err instanceof Error && err.stack) {
+          console.error(`[AI] Stack: ${err.stack}`)
+        }
         return { success: false, error: errorMessage }
       }
     },
@@ -48,6 +64,7 @@ export function registerAIIPC(): void {
     ): Promise<{ success: boolean; script?: Script; error?: string }> => {
       try {
         assertTrustedIPCEvent(event)
+        console.log(`[AI:stream] Generating script: provider=${args.config.provider} model=${args.config.model ?? 'default'} prompt="${args.prompt.slice(0, 100)}..."`)
         const provider = createAIProvider(args.config)
 
         if (!provider.generateScriptStream) {
@@ -79,6 +96,10 @@ export function registerAIIPC(): void {
         return { success: true, script: saved }
       } catch (err) {
         const error = err instanceof Error ? err.message : String(err)
+        console.error(`[AI:stream] Script generation failed: ${error}`)
+        if (err instanceof Error && err.stack) {
+          console.error(`[AI:stream] Stack: ${err.stack}`)
+        }
         const detail = {
           error,
           provider: args.config.provider,
@@ -108,11 +129,14 @@ export function registerAIIPC(): void {
     ): Promise<{ success: boolean; syncPoints?: SyncPoint[]; error?: string }> => {
       try {
         assertTrustedIPCEvent(event)
+        console.log(`[AI] Refining sync points: provider=${args.config.provider} sections=${args.script.sections.length} events=${args.domEvents.length}`)
         const provider = createAIProvider(args.config)
         const syncPoints = await provider.refineSyncPoints(args.script, args.domEvents)
+        console.log(`[AI] Sync points refined: ${syncPoints.length} points`)
         return { success: true, syncPoints }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err)
+        console.error(`[AI] Sync point refinement failed: ${errorMessage}`)
         return { success: false, error: errorMessage }
       }
     },
