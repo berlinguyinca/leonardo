@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
 export type Theme = 'dark' | 'light'
-export type WorkspacePreset = 'recording' | 'compose' | 'script' | 'export'
+export type WorkspacePreset = 'recording' | 'compose' | 'script' | 'export' | 'effects'
 export type EditorView = 'script-only' | 'inline'
 
 interface PanelSnapshot {
@@ -22,6 +22,7 @@ interface UIState {
   propertiesCollapsed: boolean
   timelineCollapsed: boolean
   panelStateBeforeRecording: PanelSnapshot | null
+  followPlayhead: boolean
 
   setTheme: (theme: Theme) => void
   setWorkspacePreset: (preset: WorkspacePreset) => void
@@ -35,6 +36,7 @@ interface UIState {
   setTimelineCollapsed: (collapsed: boolean) => void
   collapseAllPanels: () => void
   restorePanelState: () => void
+  setFollowPlayhead: (follow: boolean) => void
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -49,6 +51,7 @@ export const useUIStore = create<UIState>((set) => ({
   propertiesCollapsed: false,
   timelineCollapsed: false,
   panelStateBeforeRecording: null,
+  followPlayhead: false,
 
   setTheme: (theme) => set({ theme }),
   setWorkspacePreset: (preset) => set({ workspacePreset: preset }),
@@ -81,4 +84,5 @@ export const useUIStore = create<UIState>((set) => ({
         panelStateBeforeRecording: null,
       }
     }),
+  setFollowPlayhead: (follow) => set({ followPlayhead: follow }),
 }))

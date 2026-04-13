@@ -30,6 +30,7 @@ export interface Segment {
   sourceFile: string
   sourceOffset: number
   label: string
+  metadata?: string
 }
 
 export interface SyncPoint {

@@ -9,9 +9,10 @@ function filePathToMediaUrl(filePath: string): string {
   return `media:///${filePath}`
 }
 
-function findSegmentAt(timeline: { tracks: { segments: Segment[] }[] } | null, position: number): Segment | undefined {
+function findSegmentAt(timeline: { tracks: { type: string; segments: Segment[] }[] } | null, position: number): Segment | undefined {
   if (!timeline) return undefined
   return timeline.tracks
+    .filter((t) => t.type === 'clip' || t.type === 'recording')
     .flatMap((t) => t.segments)
     .find((s) => position >= s.startTime && position < s.endTime)
 }

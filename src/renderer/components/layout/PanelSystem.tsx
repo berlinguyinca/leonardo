@@ -10,6 +10,8 @@ import { InlineEditorView } from '../script-editor/InlineEditorView'
 import { ClipLibrary } from '../clip-library/ClipLibrary'
 import { ComposeView } from '../compose/ComposeView'
 import { ScriptPresetView } from '../script-view/ScriptPresetView'
+import { EffectsCanvas } from '../effects/EffectsCanvas'
+import { Timeline } from '../timeline/Timeline'
 
 const COLLAPSED_SIZE = 36
 
@@ -82,6 +84,65 @@ export function PanelSystem({ preset }: PanelSystemProps): React.ReactNode {
                 <ScriptPresetView />
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Effects preset: canvas + properties + timeline
+  if (preset === 'effects') {
+    return (
+      <div className="panel-system">
+        <div className="panel-main" style={{ width: '100%' }}>
+          <div className="panel-top" style={{ height: `calc(100% - ${effectiveTimelineHeight}px - 4px)` }}>
+            <div className="panel panel-preview" style={{ flex: 1 }}>
+              <div className="panel-header">Effects Canvas</div>
+              <div className="panel-content">
+                <EffectsCanvas />
+              </div>
+            </div>
+            <div
+              className={`panel panel-properties ${propertiesCollapsed ? 'panel-collapsed' : ''}`}
+              style={{ width: propertiesCollapsed ? COLLAPSED_SIZE : 300 }}
+            >
+              <div
+                className="panel-header panel-header-toggle"
+                onClick={() => setPropertiesCollapsed(!propertiesCollapsed)}
+              >
+                <span className={`collapse-chevron ${propertiesCollapsed ? 'chevron-left' : 'chevron-right'}`}>
+                  {propertiesCollapsed ? '\u25C0' : '\u25B6'}
+                </span>
+                {!propertiesCollapsed && <span>Properties</span>}
+              </div>
+              {!propertiesCollapsed && (
+                <div className="panel-content">
+                  <PropertiesPanel />
+                </div>
+              )}
+            </div>
+          </div>
+          {!timelineCollapsed && (
+            <div className="resize-handle resize-handle-h" onMouseDown={handleMouseDown('timeline')} />
+          )}
+          <div
+            className={`panel panel-timeline ${timelineCollapsed ? 'panel-collapsed' : ''}`}
+            style={{ height: effectiveTimelineHeight }}
+          >
+            <div
+              className="panel-header panel-header-toggle"
+              onClick={() => setTimelineCollapsed(!timelineCollapsed)}
+            >
+              <span className={`collapse-chevron ${timelineCollapsed ? 'chevron-up' : 'chevron-down'}`}>
+                {timelineCollapsed ? '\u25B2' : '\u25BC'}
+              </span>
+              <span>Timeline</span>
+            </div>
+            {!timelineCollapsed && (
+              <div className="panel-content">
+                <Timeline />
+              </div>
+            )}
           </div>
         </div>
       </div>

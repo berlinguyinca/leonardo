@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { temporal } from 'zundo'
-import type { SyncTimeline, SyncPoint, Track, Segment, Clip } from '@shared/types'
+import type { SyncTimeline, SyncPoint, Track, Segment, Clip, OverlayType } from '@shared/types'
+import { defaultOverlayMetadata } from '@shared/types'
 import { UNDO_HISTORY_LIMIT } from '@shared/constants'
 
 interface TimelineState {
@@ -27,6 +28,9 @@ interface TimelineState {
   removeSegment: (segmentId: string) => void
   removeSegmentsBySourceFile: (sourceFile: string) => void
   addClipToTimeline: (clip: Clip, insertTimeMs?: number) => void
+  addOverlaySegment: (overlayType: OverlayType, startTimeMs: number, durationMs?: number) => void
+  updateSegmentMetadata: (segmentId: string, metadata: string) => void
+  updateSegmentTiming: (segmentId: string, startTime: number, endTime: number) => void
 }
 
 function computeDuration(tracks: Track[]): number {
@@ -202,6 +206,98 @@ export const useTimelineStore = create<TimelineState>()(
               ...timeline,
               tracks: newTracks,
               duration: computeDuration(newTracks),
+            },
+          }
+        }),
+      addOverlaySegment: (overlayType, startTimeMs, durationMs = 3000) =>
+        set((state) => {
+          const timeline = state.timeline ?? {
+            id: crypto.randomUUID(),
+            projectId: '',
+            tracks: [],
+            syncPoints: [],
+            duration: 0,
+            reviewed: false,
+          }
+
+          const existingOverlayTrack = timeline.tracks.find((t) => t.type === 'overlay')
+          const trackId = existingOverlayTrack?.id ?? crypto.randomUUID()
+
+          const segment: Segment = {
+            id: crypto.randomUUID(),
+            trackId,
+            startTime: startTimeMs,
+            endTime: startTimeMs + durationMs,
+            sourceFile: '',
+            sourceOffset: 0,
+            label: overlayType,
+            metadata: JSON.stringify(defaultOverlayMetadata(overlayType)),
+          }
+
+          if (existingOverlayTrack) {
+            const updatedTracks = timeline.tracks.map((t) =>
+              t.id === existingOverlayTrack.id
+                ? { ...t, segments: [...t.segments, segment] }
+                : t,
+            )
+            return {
+              timeline: {
+                ...timeline,
+                tracks: updatedTracks,
+                duration: computeDuration(updatedTracks),
+              },
+            }
+          }
+
+          const newTrack: Track = {
+            id: trackId,
+            type: 'overlay',
+            segments: [segment],
+            zOrder: 10,
+            label: 'Overlays',
+            muted: false,
+            locked: false,
+          }
+
+          const newTracks = [...timeline.tracks, newTrack]
+          return {
+            timeline: {
+              ...timeline,
+              tracks: newTracks,
+              duration: computeDuration(newTracks),
+            },
+          }
+        }),
+      updateSegmentMetadata: (segmentId, metadata) =>
+        set((state) => {
+          if (!state.timeline) return state
+          const updatedTracks = state.timeline.tracks.map((t) => ({
+            ...t,
+            segments: t.segments.map((s) =>
+              s.id === segmentId ? { ...s, metadata } : s,
+            ),
+          }))
+          return {
+            timeline: {
+              ...state.timeline,
+              tracks: updatedTracks,
+            },
+          }
+        }),
+      updateSegmentTiming: (segmentId, startTime, endTime) =>
+        set((state) => {
+          if (!state.timeline) return state
+          const updatedTracks = state.timeline.tracks.map((t) => ({
+            ...t,
+            segments: t.segments.map((s) =>
+              s.id === segmentId ? { ...s, startTime, endTime } : s,
+            ),
+          }))
+          return {
+            timeline: {
+              ...state.timeline,
+              tracks: updatedTracks,
+              duration: computeDuration(updatedTracks),
             },
           }
         }),

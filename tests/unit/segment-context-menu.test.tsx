@@ -79,6 +79,7 @@ vi.mock('../../src/renderer/hooks/usePointerDrag', () => ({
 }))
 vi.mock('../../src/renderer/components/timeline/timeline-utils', () => ({
   timeToPixel: (time: number) => time / 50,
+  pixelToTime: (px: number) => px * 50,
 }))
 vi.mock('../../src/renderer/components/timeline/ThumbnailStrip', () => ({
   ThumbnailStrip: () => null,

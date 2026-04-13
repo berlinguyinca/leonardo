@@ -8,6 +8,7 @@ const WORKSPACE_TABS: { preset: WorkspacePreset; label: string }[] = [
   { preset: 'recording', label: 'Record' },
   { preset: 'compose', label: 'Compose' },
   { preset: 'script', label: 'Script' },
+  { preset: 'effects', label: 'Effects' },
   { preset: 'export', label: 'Export' },
 ]
 

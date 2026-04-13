@@ -38,7 +38,23 @@ export function useUndoRedo(): void {
       }
     }
 
+    // Prevent button activation from keyup when space is used for play/pause.
+    // Browsers activate focused <button> elements on keyup for Space — calling
+    // preventDefault on keyup suppresses that activation so the keydown handler
+    // is the single source of truth for the space toggle.
+    const handleKeyUp = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+      if (e.key === ' ' && !isInput) {
+        e.preventDefault()
+      }
+    }
+
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+    }
   }, [])
 }

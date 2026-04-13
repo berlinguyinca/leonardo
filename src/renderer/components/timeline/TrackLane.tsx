@@ -60,7 +60,7 @@ export function TrackLane({
   }
 
   return (
-    <div className={`track-lane${track.type === 'audio' ? ' track-audio' : ''}`} data-track-id={track.id}>
+    <div className={`track-lane${track.type === 'audio' ? ' track-audio' : ''}${track.type === 'overlay' ? ' track-overlay' : ''}`} data-track-id={track.id}>
       <TrackHeader track={track} onToggleMute={onToggleMute} onToggleLock={onToggleLock} />
       <div
         className="track-content"
@@ -73,6 +73,7 @@ export function TrackLane({
           <Segment
             key={seg.id}
             segment={seg}
+            trackType={track.type}
             zoomLevel={zoomLevel}
             scrollOffset={scrollOffset}
             snapTargets={snapTargets}

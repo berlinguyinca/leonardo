@@ -10,7 +10,6 @@ interface VideoPlayerProps {
 export function VideoPlayer({ src, currentTime, playing, playbackRate }: VideoPlayerProps): React.ReactNode {
   const videoRef = useRef<HTMLVideoElement>(null)
   const readyRef = useRef(false)
-  const lastSeekTime = useRef(0)
 
   // Keep prop values in refs so the loadeddata handler always has current values
   const currentTimeRef = useRef(currentTime)
@@ -63,17 +62,14 @@ export function VideoPlayer({ src, currentTime, playing, playbackRate }: VideoPl
     video.playbackRate = playbackRate
   }, [playbackRate])
 
-  // Sync seek position (debounced) — only when paused and video is ready
+  // Sync seek position — only when paused and video is ready.
+  // No debounce: arrow key frame stepping needs every seek to land immediately.
   useEffect(() => {
     const video = videoRef.current
     if (!video || playing || !readyRef.current) return
     const timeSec = currentTime / 1000
     if (Math.abs(video.currentTime - timeSec) > 0.05) {
-      const now = Date.now()
-      if (now - lastSeekTime.current > 50) {
-        video.currentTime = timeSec
-        lastSeekTime.current = now
-      }
+      video.currentTime = timeSec
     }
   }, [currentTime, playing])
 
