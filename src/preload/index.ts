@@ -5,6 +5,7 @@ import type { ArchiveImportResult } from '../main/services/archive'
 import type { Clip, DOMEvent } from '@shared/types/events'
 import type { AIBackendConfig, Script, ScriptGenContext, ScriptSection } from '@shared/types/ai'
 import type { SyncTimeline } from '@shared/types'
+import type { TTSEngineType, VoiceProfile, TTSSynthesisResult } from '@shared/types/tts'
 
 const api = {
   project: {
@@ -34,6 +35,7 @@ const api = {
       success: boolean
       recordingId?: string
       outputDir?: string
+      warning?: string
       error?: string
     }> => ipcRenderer.invoke(IPC_CHANNELS.RECORDING_START, args),
     stop: (): Promise<{
@@ -114,6 +116,8 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.SCRIPT_SAVE, script, clipId),
     listByProject: (projectId: string): Promise<Array<Script & { sections: ScriptSection[] }>> =>
       ipcRenderer.invoke(IPC_CHANNELS.SCRIPT_LIST_BY_PROJECT, projectId),
+    delete: (clipId: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCRIPT_DELETE, { clipId }),
   },
   settings: {
     get: (key: string): Promise<string | null> =>
@@ -128,6 +132,14 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.TIMELINE_GET, projectId),
     delete: (projectId: string): Promise<boolean> =>
       ipcRenderer.invoke(IPC_CHANNELS.TIMELINE_DELETE, projectId),
+  },
+  tts: {
+    synthesize: (args: { text: string; voice: VoiceProfile; engine: TTSEngineType }): Promise<TTSSynthesisResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.TTS_SYNTHESIZE, args),
+    listVoices: (engine: TTSEngineType): Promise<VoiceProfile[]> =>
+      ipcRenderer.invoke('tts:list-voices', engine),
+    testConnection: (engine: TTSEngineType): Promise<boolean> =>
+      ipcRenderer.invoke('tts:test-connection', engine),
   },
 }
 

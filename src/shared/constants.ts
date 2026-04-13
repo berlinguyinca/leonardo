@@ -42,6 +42,7 @@ export const IPC_CHANNELS = {
   LOG_CLEAR: 'log:clear',
   SCRIPT_SAVE: 'script:save',
   SCRIPT_LIST_BY_PROJECT: 'script:list-by-project',
+  SCRIPT_DELETE: 'script:delete',
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET: 'settings:set',
   TIMELINE_SAVE: 'timeline:save',

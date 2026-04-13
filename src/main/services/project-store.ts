@@ -182,6 +182,13 @@ function runMigrations(db: Database.Database): void {
   ]) {
     try { db.exec(sql) } catch { /* column already exists */ }
   }
+
+  // Idempotent column additions for segments table (added in v5)
+  for (const sql of [
+    `ALTER TABLE segments ADD COLUMN metadata TEXT DEFAULT NULL`,
+  ]) {
+    try { db.exec(sql) } catch { /* column already exists */ }
+  }
 }
 
 // --- Project CRUD ---
@@ -396,6 +403,11 @@ export function listScriptsByProject(
   }))
 }
 
+export function deleteScriptsForClip(clipId: string): void {
+  const db = getDatabase()
+  db.prepare('DELETE FROM scripts WHERE clip_id = ?').run(clipId)
+}
+
 // --- Timeline CRUD ---
 
 export function saveTimeline(timeline: SyncTimeline): void {
@@ -422,15 +434,15 @@ export function saveTimeline(timeline: SyncTimeline): void {
     // Insert tracks and segments
     const insertTrack = db.prepare(`INSERT INTO tracks (id, timeline_id, type, z_order, label, muted, locked)
       VALUES (?, ?, ?, ?, ?, ?, ?)`)
-    const insertSegment = db.prepare(`INSERT INTO segments (id, track_id, start_time, end_time, source_file, source_offset, label)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    const insertSegment = db.prepare(`INSERT INTO segments (id, track_id, start_time, end_time, source_file, source_offset, label, metadata)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
 
     for (const track of timeline.tracks) {
       insertTrack.run(track.id, timeline.id, track.type, track.zOrder, track.label,
         track.muted ? 1 : 0, track.locked ? 1 : 0)
       for (const seg of track.segments) {
         insertSegment.run(seg.id, track.id, seg.startTime, seg.endTime,
-          seg.sourceFile, seg.sourceOffset, seg.label)
+          seg.sourceFile, seg.sourceOffset, seg.label, seg.metadata ?? null)
       }
     }
 
@@ -474,6 +486,7 @@ export function getTimeline(projectId: string): SyncTimeline | null {
       sourceFile: sr.source_file as string,
       sourceOffset: sr.source_offset as number,
       label: sr.label as string,
+      metadata: (sr.metadata as string) ?? undefined,
     }))
 
     return {

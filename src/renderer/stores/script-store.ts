@@ -58,9 +58,11 @@ export const useScriptStore = create<ScriptState>((set, get) => ({
       return { clipScripts: rest }
     }),
   loadProjectScripts: (scripts) =>
-    set(() => ({
-      clipScripts: Object.fromEntries(scripts.map((s) => [s.clipId, s.sections])),
-    })),
+    set(() => {
+      const clipScripts = Object.fromEntries(scripts.map((s) => [s.clipId, s.sections]))
+      const firstSections = scripts[0]?.sections ?? []
+      return { clipScripts, sections: firstSections }
+    }),
   assignEventToSection: (sectionId, eventId) =>
     set((state) => ({
       sections: state.sections.map((s) => {

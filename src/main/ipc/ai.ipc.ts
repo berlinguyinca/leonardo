@@ -5,7 +5,7 @@ import { getSystemPrompt, buildScriptPrompt } from '../services/ai/prompt-templa
 import type { DOMEvent } from '@shared/types/events'
 import type { SyncPoint } from '@shared/types/timeline'
 import { createAIProvider } from '../services/ai'
-import { saveScript, listScriptsByProject } from '../services/project-store'
+import { saveScript, listScriptsByProject, deleteScriptsForClip } from '../services/project-store'
 import { assertTrustedIPCEvent } from './security'
 
 export function registerAIIPC(): void {
@@ -178,6 +178,15 @@ export function registerAIIPC(): void {
     async (event, projectId: string): Promise<Array<Script & { sections: ScriptSection[] }>> => {
       assertTrustedIPCEvent(event)
       return listScriptsByProject(projectId)
+    },
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.SCRIPT_DELETE,
+    async (event, args: { clipId: string }): Promise<{ success: boolean }> => {
+      assertTrustedIPCEvent(event)
+      deleteScriptsForClip(args.clipId)
+      return { success: true }
     },
   )
 
