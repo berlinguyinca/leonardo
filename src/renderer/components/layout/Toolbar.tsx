@@ -6,8 +6,8 @@ import { ViewModeToggle } from './ViewModeToggle'
 const MENU_ITEMS = ['File', 'Edit', 'View', 'Playback'] as const
 const WORKSPACE_TABS: { preset: WorkspacePreset; label: string }[] = [
   { preset: 'recording', label: 'Record' },
-  { preset: 'compose', label: 'Compose' },
   { preset: 'script', label: 'Script' },
+  { preset: 'compose', label: 'Compose' },
   { preset: 'effects', label: 'Effects' },
   { preset: 'export', label: 'Export' },
 ]

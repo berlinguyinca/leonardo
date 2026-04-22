@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useUIStore } from '../../stores/ui-store'
 import { useProjectStore } from '../../stores/project-store'
+import { useToastStore } from '../../stores/toast-store'
 import type { InputModeType } from '@shared/types'
 import { RESOLUTION_PRESETS } from '@shared/types'
 
@@ -44,18 +45,23 @@ export function ProjectWizard(): React.ReactNode {
     if (!trimmedName) return
 
     const resolution = RESOLUTION_PRESETS[selectedResolution]
-    const project = await window.leonardo.project.create({
-      name: trimmedName,
-      inputMode: selectedMode,
-      resolution,
-    })
-    addProject(project)
-    setActiveProject(project.id)
-    window.leonardo?.settings?.set('lastActiveProjectId', project.id)
-    setShowProjectWizard(false)
-    setName('')
-    setSelectedMode('record-first')
-    setSelectedResolution('1080p')
+    try {
+      const project = await window.leonardo.project.create({
+        name: trimmedName,
+        inputMode: selectedMode,
+        resolution,
+      })
+      addProject(project)
+      setActiveProject(project.id)
+      window.leonardo?.settings?.set('lastActiveProjectId', project.id)
+      setShowProjectWizard(false)
+      setName('')
+      setSelectedMode('record-first')
+      setSelectedResolution('1080p')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      useToastStore.getState().addToast(`Failed to create project: ${msg}`, 'error')
+    }
   }
 
   const handleCancel = () => {

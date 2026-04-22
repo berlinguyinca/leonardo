@@ -4,6 +4,7 @@ import { useProjectStore } from '../../stores/project-store'
 import { useScriptStore } from '../../stores/script-store'
 import { useTimelineStore } from '../../stores/timeline-store'
 import { useComposeStore } from '../../stores/compose-store'
+import { useToastStore } from '../../stores/toast-store'
 import { useUndoRedo } from '../../hooks/useUndoRedo'
 import { Toolbar } from './Toolbar'
 import { PanelSystem } from './PanelSystem'
@@ -25,8 +26,9 @@ export function Workspace(): React.ReactNode {
             .map((s) => ({ clipId: s.clipId!, sections: s.sections })),
         )
       })
-      .catch(() => {
-        // Script pre-loading failed; scripts will be generated fresh as needed
+      .catch((err) => {
+        console.error('[Workspace] Failed to load scripts:', err)
+        useToastStore.getState().addToast('Failed to load scripts', 'warning')
       })
   }, [activeProjectId, loadProjectScripts])
 
@@ -51,7 +53,9 @@ export function Workspace(): React.ReactNode {
           useComposeStore.getState().syncFromTimeline(segments, {})
         }
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error('[Workspace] Failed to load timeline:', err)
+        useToastStore.getState().addToast('Failed to load timeline', 'error')
         useTimelineStore.getState().setTimeline(null)
       })
   }, [activeProjectId])

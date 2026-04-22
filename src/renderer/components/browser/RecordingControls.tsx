@@ -4,6 +4,7 @@ import { useUIStore } from '../../stores/ui-store'
 import { useLibraryStore } from '../../stores/library-store'
 import { useTimelineStore } from '../../stores/timeline-store'
 import { useProjectStore } from '../../stores/project-store'
+import { useToastStore } from '../../stores/toast-store'
 import type { Clip } from '@shared/types/events'
 
 interface RecordingControlsProps {
@@ -80,20 +81,42 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
       stopTimer()
       return
     }
-    await window.leonardo.recording.start({ webviewId: webContentsId, projectId: activeProjectId ?? undefined })
+    try {
+      const result = await window.leonardo.recording.start({ webviewId: webContentsId, projectId: activeProjectId ?? undefined })
+      if (!result.success) {
+        throw new Error(result.error ?? 'Recording failed to start')
+      }
+      if (result.warning) {
+        useToastStore.getState().addToast(result.warning, 'warning')
+      }
+    } catch (err) {
+      setStatus('idle')
+      restorePanelState()
+      stopTimer()
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      useToastStore.getState().addToast(`Recording failed: ${msg}`, 'error')
+    }
   }, [status, setStatus, setRecordingDuration, startTimer, stopTimer, collapseAllPanels, restorePanelState, webviewRef, activeProjectId])
 
-  const handlePause = useCallback(() => {
+  const handlePause = useCallback(async () => {
     setStatus('paused')
     stopTimer()
     setPausedDuration(recordingDuration)
-    window.leonardo.recording.pause()
+    try {
+      await window.leonardo.recording.pause()
+    } catch {
+      useToastStore.getState().addToast('Failed to pause recording', 'warning')
+    }
   }, [setStatus, stopTimer, recordingDuration])
 
-  const handleResume = useCallback(() => {
+  const handleResume = useCallback(async () => {
     setStatus('recording')
     startTimer()
-    window.leonardo.recording.resume()
+    try {
+      await window.leonardo.recording.resume()
+    } catch {
+      useToastStore.getState().addToast('Failed to resume recording', 'warning')
+    }
   }, [setStatus, startTimer])
 
   const handleStop = useCallback(async () => {
@@ -101,7 +124,13 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
     setStatus('processing')
     try {
       const result = await window.leonardo.recording.stop()
-      if (!result.success || !result.recordingId || !result.videoPath) return
+      if (!result.success || !result.recordingId || !result.videoPath) {
+        useToastStore.getState().addToast(
+          `Recording failed: ${result.error ?? 'No video was captured'}`,
+          'error',
+        )
+        return
+      }
 
       const currentClipCount = useLibraryStore.getState().clips.length
       const clip: Clip = {
@@ -117,6 +146,9 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
       await addClip(clip)
       setHighlightedClip(clip.id)
       setPendingClip(clip)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      useToastStore.getState().addToast(`Recording stop failed: ${msg}`, 'error')
     } finally {
       restorePanelState()
       setStatus('idle')
@@ -175,7 +207,7 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
           <button
             onClick={() => {
               addClipToTimeline(pendingClip)
-              setWorkspacePreset('compose')
+              setWorkspacePreset('script')
               setEditorView('inline')
               setTimelineCollapsed(false)
               setPendingClip(null)

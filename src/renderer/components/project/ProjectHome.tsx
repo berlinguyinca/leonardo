@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useProjectStore } from '../../stores/project-store'
 import { useUIStore } from '../../stores/ui-store'
+import { useToastStore } from '../../stores/toast-store'
 import { ProjectCard } from './ProjectCard'
 
 export function ProjectHome(): React.ReactNode {
@@ -17,8 +18,13 @@ export function ProjectHome(): React.ReactNode {
   }
 
   const handleDelete = async (projectId: string) => {
-    await window.leonardo.project.delete(projectId)
-    removeProject(projectId)
+    try {
+      await window.leonardo.project.delete(projectId)
+      removeProject(projectId)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      useToastStore.getState().addToast(`Failed to delete project: ${msg}`, 'error')
+    }
     setConfirmDeleteId(null)
   }
 
