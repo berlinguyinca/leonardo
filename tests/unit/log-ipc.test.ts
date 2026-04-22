@@ -76,13 +76,10 @@ describe('log IPC handlers', () => {
     expect(result).toBe('')
   })
 
-  it('returns { success: false, error } when readLog throws', async () => {
+  it('rejects when readLog throws', async () => {
     mockReadLog.mockImplementation(() => { throw new Error('read error') })
 
-    const result = await invokeHandle('log:read') as { success: boolean; error: string }
-
-    expect(result.success).toBe(false)
-    expect(result.error).toBe('read error')
+    await expect(invokeHandle('log:read')).rejects.toThrow('read error')
   })
 
   it('calls clearLog when log:clear is invoked', async () => {
@@ -91,12 +88,9 @@ describe('log IPC handlers', () => {
     expect(mockClearLog).toHaveBeenCalledTimes(1)
   })
 
-  it('returns { success: false, error } when clearLog throws', async () => {
+  it('rejects when clearLog throws', async () => {
     mockClearLog.mockImplementation(() => { throw new Error('clear error') })
 
-    const result = await invokeHandle('log:clear') as { success: boolean; error: string }
-
-    expect(result.success).toBe(false)
-    expect(result.error).toBe('clear error')
+    await expect(invokeHandle('log:clear')).rejects.toThrow('clear error')
   })
 })

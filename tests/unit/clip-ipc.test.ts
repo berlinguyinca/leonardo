@@ -114,13 +114,10 @@ describe('clip IPC handlers', () => {
       expect(result).toEqual(clip)
     })
 
-    it('returns { success: false, error } when createClip throws', async () => {
+    it('rejects when createClip throws', async () => {
       mockCreateClip.mockImplementation(() => { throw new Error('DB error') })
 
-      const result = await invokeHandle('clip:create', makeClip()) as { success: boolean; error: string }
-
-      expect(result.success).toBe(false)
-      expect(result.error).toBe('DB error')
+      await expect(invokeHandle('clip:create', makeClip())).rejects.toThrow('DB error')
     })
   })
 
@@ -148,13 +145,10 @@ describe('clip IPC handlers', () => {
       expect(result).toEqual(clips)
     })
 
-    it('returns { success: false, error } when listClips throws', async () => {
+    it('rejects when listClips throws', async () => {
       mockListClips.mockImplementation(() => { throw new Error('list error') })
 
-      const result = await invokeHandle('clip:list') as { success: boolean; error: string }
-
-      expect(result.success).toBe(false)
-      expect(result.error).toBe('list error')
+      await expect(invokeHandle('clip:list')).rejects.toThrow('list error')
     })
   })
 
@@ -214,17 +208,9 @@ describe('clip IPC handlers', () => {
       expect(result).toBe(false)
     })
 
-    it('returns { success: false, error } when transaction throws', async () => {
+    it('rejects when transaction throws', async () => {
       const clip = makeClip({ id: 'clip-err', filePath: '/tmp/test-userData/recordings/session/clip.mp4' })
       mockListClips.mockReturnValue([clip])
-
-      const db = mockGetDatabase.mock.results[0]?.value ?? (() => {
-        const mockRun = vi.fn()
-        const mockPrepare = vi.fn().mockReturnValue({ run: mockRun })
-        const val = { prepare: mockPrepare, transaction: vi.fn() }
-        mockGetDatabase.mockReturnValue(val)
-        return val
-      })()
 
       // Make transaction throw
       mockGetDatabase.mockReturnValue({
@@ -232,10 +218,7 @@ describe('clip IPC handlers', () => {
         transaction: vi.fn().mockImplementation(() => () => { throw new Error('transaction failed') }),
       })
 
-      const result = await invokeHandle('clip:delete', 'clip-err') as { success: boolean; error: string }
-
-      expect(result.success).toBe(false)
-      expect(result.error).toBe('transaction failed')
+      await expect(invokeHandle('clip:delete', 'clip-err')).rejects.toThrow('transaction failed')
     })
   })
 
@@ -290,7 +273,7 @@ describe('clip IPC handlers', () => {
       expect(result.error).toBe('Cancelled')
     })
 
-    it('returns error when copyFile throws', async () => {
+    it('rejects when copyFile throws', async () => {
       const clip = makeClip({ id: 'clip-err', filePath: '/recordings/clip.mp4' })
       mockListClips.mockResolvedValue([clip])
       vi.mocked(dialog.showSaveDialog).mockResolvedValue({
@@ -299,13 +282,7 @@ describe('clip IPC handlers', () => {
       })
       vi.mocked(fs.promises.copyFile).mockRejectedValueOnce(new Error('disk full'))
 
-      const result = (await invokeHandle('clip:export', 'clip-err')) as {
-        success: boolean
-        error: string
-      }
-
-      expect(result.success).toBe(false)
-      expect(result.error).toBe('disk full')
+      await expect(invokeHandle('clip:export', 'clip-err')).rejects.toThrow('disk full')
     })
   })
 

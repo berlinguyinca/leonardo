@@ -206,7 +206,7 @@ describe('PlaybackPanel — real-time segment switching via emitter', () => {
 
     // Initially showing video-a (playheadPosition=1000 is in seg-1)
     const videoA = container.querySelector('video')
-    expect(videoA?.getAttribute('src')).toBe('media:////video-a.mp4')
+    expect(videoA?.getAttribute('src')).toBe('media:///video-a.mp4')
 
     // Emit position in segment 2 (> 5000)
     act(() => {
@@ -215,7 +215,7 @@ describe('PlaybackPanel — real-time segment switching via emitter', () => {
 
     // Should now show video-b
     const videoB = container.querySelector('video')
-    expect(videoB?.getAttribute('src')).toBe('media:////video-b.mp4')
+    expect(videoB?.getAttribute('src')).toBe('media:///video-b.mp4')
   })
 
   it('uses store position when paused (not emitter)', () => {
@@ -230,7 +230,7 @@ describe('PlaybackPanel — real-time segment switching via emitter', () => {
 
     // Should still show video-a based on store position
     const video = container.querySelector('video')
-    expect(video?.getAttribute('src')).toBe('media:////video-a.mp4')
+    expect(video?.getAttribute('src')).toBe('media:///video-a.mp4')
   })
 })
 

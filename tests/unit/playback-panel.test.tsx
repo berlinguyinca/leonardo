@@ -104,7 +104,7 @@ describe('PlaybackPanel', () => {
     const { container } = render(<PlaybackPanel />)
     const video = container.querySelector('video')
     expect(video).not.toBeNull()
-    expect(video?.getAttribute('src')).toBe('media:////path/to/video.mp4')
+    expect(video?.getAttribute('src')).toBe('media:///path/to/video.mp4')
   })
 
   it('shows placeholder when playhead is outside all segments', () => {
@@ -143,11 +143,11 @@ describe('PlaybackPanel', () => {
     })
 
     const { container, rerender } = render(<PlaybackPanel />)
-    expect(container.querySelector('video')?.getAttribute('src')).toBe('media:////video-a.mp4')
+    expect(container.querySelector('video')?.getAttribute('src')).toBe('media:///video-a.mp4')
 
     // Move playhead to second segment
     useTimelineStore.setState({ playheadPosition: 4000 })
     rerender(<PlaybackPanel />)
-    expect(container.querySelector('video')?.getAttribute('src')).toBe('media:////video-b.mp4')
+    expect(container.querySelector('video')?.getAttribute('src')).toBe('media:///video-b.mp4')
   })
 })

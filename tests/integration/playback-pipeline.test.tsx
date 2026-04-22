@@ -124,7 +124,7 @@ describe('Playback pipeline — integration', () => {
     const video = container.querySelector('video')!
 
     // Initially showing clip A
-    expect(video.getAttribute('src')).toBe('media:////video-a.mp4')
+    expect(video.getAttribute('src')).toBe('media:///video-a.mp4')
 
     // Emit position past segment boundary (into segment 2)
     act(() => {
@@ -132,7 +132,7 @@ describe('Playback pipeline — integration', () => {
     })
 
     // Src should now point to clip B
-    expect(video.getAttribute('src')).toBe('media:////video-b.mp4')
+    expect(video.getAttribute('src')).toBe('media:///video-b.mp4')
   })
 
   it('play from end resets position to 0', () => {

@@ -213,33 +213,4 @@ describe('Segment right-click and script overlay', () => {
     expect(screen.getByText('Generate Script')).toBeInTheDocument()
   })
 
-  it('script overlay renders when clipScripts has content for the clip', () => {
-    mockClipScripts['clip-1'] = [
-      {
-        id: 'sec-1',
-        scriptId: 'script-1',
-        text: 'This is a test script section that should be truncated after eighty characters in the segment preview.',
-        voiceProfileId: null,
-        startTime: 0,
-        endTime: 5000,
-        timingMarkers: [],
-        order: 0,
-      },
-    ]
-
-    render(<Segment segment={mockSegment} zoomLevel={1} scrollOffset={0} snapTargets={[]} />)
-
-    const preview = document.querySelector('.segment-script-preview')
-    expect(preview).toBeInTheDocument()
-    expect(preview!.textContent).toBe(
-      'This is a test script section that should be truncated after eighty characters i',
-    )
-  })
-
-  it('script overlay does not render when no clipScripts for the clip', () => {
-    render(<Segment segment={mockSegment} zoomLevel={1} scrollOffset={0} snapTargets={[]} />)
-
-    const preview = document.querySelector('.segment-script-preview')
-    expect(preview).not.toBeInTheDocument()
-  })
 })

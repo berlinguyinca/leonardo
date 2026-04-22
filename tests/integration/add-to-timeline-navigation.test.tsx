@@ -138,7 +138,7 @@ describe('add to timeline — view navigation', () => {
       act(() => {
         fireEvent.click(screen.getByText('Edit Now'))
       })
-      expect(useUIStore.getState().workspacePreset).toBe('compose')
+      expect(useUIStore.getState().workspacePreset).toBe('script')
     })
   })
 })

@@ -127,7 +127,7 @@ describe('EffectsCanvas', () => {
     const { container } = render(<EffectsCanvas />)
     const video = container.querySelector('video')
     expect(video).not.toBeNull()
-    expect(video?.getAttribute('src')).toBe('media:////path/to/video.mp4')
+    expect(video?.getAttribute('src')).toBe('media:///path/to/video.mp4')
   })
 
   it('does not render video when playhead is past clip segment end', () => {
@@ -192,7 +192,7 @@ describe('PlaybackPanel — findSegmentAt overlay fix', () => {
     // Should show video (not fall through to "no video" placeholder)
     const video = container.querySelector('video')
     expect(video).not.toBeNull()
-    expect(video?.getAttribute('src')).toBe('media:////path/to/video.mp4')
+    expect(video?.getAttribute('src')).toBe('media:///path/to/video.mp4')
   })
 
   it('shows placeholder when only overlay track exists (no clip)', () => {

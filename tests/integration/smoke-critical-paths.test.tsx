@@ -35,6 +35,9 @@ vi.mock('../../src/renderer/components/compose/ComposeView', () => ({
 vi.mock('../../src/renderer/components/script-view/ScriptPresetView', () => ({
   ScriptPresetView: () => <div data-testid="script-preset-view">ScriptPresetView</div>,
 }))
+vi.mock('../../src/renderer/components/script-editor/ScriptTimelineView', () => ({
+  ScriptTimelineView: () => <div data-testid="script-timeline-view">ScriptTimelineView</div>,
+}))
 vi.mock('../../src/renderer/components/effects/EffectsCanvas', () => ({
   EffectsCanvas: () => <div data-testid="effects-canvas" className="effects-canvas">EffectsCanvas</div>,
 }))
@@ -215,15 +218,15 @@ describe('smoke-critical-paths', () => {
     const { container, rerender } = render(<PanelSystem preset="compose" />)
     expect(container.querySelector('[data-testid="compose-view"]')).not.toBeNull()
 
-    // Switch to script preset
+    // Switch to script preset (now uses ScriptTimelineView)
     rerender(<PanelSystem preset="script" />)
-    expect(container.querySelector('[data-testid="script-preset-view"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="script-timeline-view"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="compose-view"]')).toBeNull()
 
     // Switch back to compose
     rerender(<PanelSystem preset="compose" />)
     expect(container.querySelector('[data-testid="compose-view"]')).not.toBeNull()
-    expect(container.querySelector('[data-testid="script-preset-view"]')).toBeNull()
+    expect(container.querySelector('[data-testid="script-timeline-view"]')).toBeNull()
   })
 
   it('effects canvas renders overlay element in effects preset', () => {
