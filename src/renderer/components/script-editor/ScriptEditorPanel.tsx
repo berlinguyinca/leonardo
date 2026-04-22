@@ -121,7 +121,7 @@ export function ScriptEditorPanel({ clipId }: ScriptEditorPanelProps): React.Rea
         // New section inserted by user
         return {
           id: crypto.randomUUID(),
-          scriptId: existing?.scriptId ?? activeSections[0]?.scriptId ?? '',
+          scriptId: activeSections[0]?.scriptId ?? '',
           text: parsed.text,
           voiceProfileId: null,
           startTime: 0,

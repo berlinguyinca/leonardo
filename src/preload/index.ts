@@ -3,7 +3,7 @@ import { IPC_CHANNELS } from '@shared/constants'
 import type { Project, InputModeType, Resolution } from '@shared/types/project'
 import type { ArchiveImportResult } from '../main/services/archive'
 import type { Clip, DOMEvent } from '@shared/types/events'
-import type { AIBackendConfig, Script, ScriptGenContext, ScriptSection } from '@shared/types/ai'
+import type { AIBackendConfig, GenerationLog, Script, ScriptGenContext, ScriptSection } from '@shared/types/ai'
 import type { SyncTimeline } from '@shared/types'
 import type { TTSEngineType, VoiceProfile, TTSSynthesisResult } from '@shared/types/tts'
 
@@ -80,7 +80,7 @@ const api = {
       context: ScriptGenContext
       projectId: string
       clipId?: string
-    }): Promise<{ success: boolean; script?: Script; error?: string }> =>
+    }): Promise<{ success: boolean; script?: Script; generationLog?: GenerationLog; error?: string }> =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_SCRIPT, args),
     generateScriptStream: (args: {
       config: AIBackendConfig
@@ -88,7 +88,7 @@ const api = {
       context: ScriptGenContext
       projectId: string
       clipId?: string
-    }): Promise<{ success: boolean; script?: Script; error?: string }> =>
+    }): Promise<{ success: boolean; script?: Script; generationLog?: GenerationLog; error?: string }> =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_GENERATE_SCRIPT_STREAM, args),
     onStreamChunk: (cb: (chunk: string) => void): void => {
       ipcRenderer.on(IPC_CHANNELS.AI_STREAM_CHUNK, (_e, chunk) => cb(chunk))

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, protocol, net } from 'electron'
+import { app, BrowserWindow, shell, protocol } from 'electron'
 import { join, normalize, extname } from 'path'
 import { existsSync, statSync, createReadStream } from 'fs'
 import { registerProjectIPC } from './ipc/project.ipc'
