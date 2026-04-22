@@ -1,0 +1,49 @@
+appId: com.leonardo.app
+productName: Leonardo
+copyright: Copyright © 2026
+
+directories:
+  buildResources: build
+  output: release
+
+files:
+  - out/**/*
+  - package.json
+  - '!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}'
+  - '!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}'
+  - '!**/*.{md,markdown,ts,tsx}'
+  - '!**/tsconfig*.json'
+  - '!**/.eslintrc*'
+
+asarUnpack:
+  - '**/node_modules/better-sqlite3/**'
+  - '**/node_modules/msedge-tts/**'
+
+mac:
+  category: public.app-category.video
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+  hardenedRuntime: false
+  gatekeeperAssess: false
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+linux:
+  category: AudioVideo
+  target:
+    - target: AppImage
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+
+publish: null

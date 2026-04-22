@@ -11,6 +11,10 @@
     "test:watch": "vitest",
     "test:e2e": "npx playwright test",
     "lint": "tsc --noEmit",
+    "dist": "npm run build && electron-builder",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:linux": "npm run build && electron-builder --linux",
     "postinstall": "electron-rebuild -f -w better-sqlite3",
     "pretest": "npm rebuild better-sqlite3",
     "posttest": "electron-rebuild -f -w better-sqlite3"
