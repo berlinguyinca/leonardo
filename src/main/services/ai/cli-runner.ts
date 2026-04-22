@@ -20,6 +20,10 @@ export function runCLI(
   timeoutMs: number = 120_000,
 ): Promise<CLIRunResult> {
   return new Promise((resolve, reject) => {
+    // Log the command (redact long stdin to avoid flooding logs)
+    const argSummary = args.filter((a) => a.length < 200).join(' ')
+    console.log(`[CLI] Spawning: ${binary} ${argSummary} (stdin: ${stdinData ? `${stdinData.length} chars` : 'none'})`)
+
     const proc = spawn(binary, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env },
@@ -67,10 +71,15 @@ export function runCLI(
       }
 
       if (code !== 0) {
-        reject(new Error(`${binary} exited with code ${code}: ${stderr.slice(-500)}`))
+        // Include both stderr and stdout in error — some CLIs (e.g. Claude) write errors to stdout
+        const errorOutput = stderr.trim() || stdout.trim()
+        const detail = errorOutput.slice(-500) || '(no output)'
+        console.error(`[CLI] ${binary} exited with code ${code}: ${detail}`)
+        reject(new Error(`${binary} exited with code ${code}: ${detail}`))
         return
       }
 
+      console.log(`[CLI] ${binary} completed successfully (${stdout.length} chars output)`)
       resolve({ stdout, stderr })
     })
 
@@ -96,6 +105,9 @@ export function runCLIStreaming(
   timeoutMs = 120_000,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
+    const argSummary = args.filter((a) => a.length < 200).join(' ')
+    console.log(`[CLI:stream] Spawning: ${binary} ${argSummary} (stdin: ${stdinData ? `${stdinData.length} chars` : 'none'})`)
+
     const proc = spawn(binary, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env },
@@ -146,10 +158,14 @@ export function runCLIStreaming(
       }
 
       if (code !== 0) {
-        reject(new Error(`${binary} exited with code ${code}: ${stderr.slice(-500)}`))
+        const errorOutput = stderr.trim() || stdout.trim()
+        const detail = errorOutput.slice(-500) || '(no output)'
+        console.error(`[CLI:stream] ${binary} exited with code ${code}: ${detail}`)
+        reject(new Error(`${binary} exited with code ${code}: ${detail}`))
         return
       }
 
+      console.log(`[CLI:stream] ${binary} completed successfully (${stdout.length} chars output)`)
       resolve(stdout)
     })
 

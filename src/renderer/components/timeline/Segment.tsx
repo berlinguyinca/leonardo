@@ -4,7 +4,6 @@ import { parseOverlayMetadata } from '@shared/types'
 import type { OverlayType } from '@shared/types'
 import { useTimelineStore } from '../../stores/timeline-store'
 import { useLibraryStore } from '../../stores/library-store'
-import { useScriptStore } from '../../stores/script-store'
 import { usePointerDrag } from '../../hooks/usePointerDrag'
 import { timeToPixel } from './timeline-utils'
 import { ThumbnailStrip } from './ThumbnailStrip'
@@ -30,7 +29,6 @@ export function Segment({ segment, trackType, zoomLevel, scrollOffset, snapTarge
   const setSelectedSegment = useTimelineStore((s) => s.setSelectedSegment)
   const updateSegmentTiming = useTimelineStore((s) => s.updateSegmentTiming)
   const clips = useLibraryStore((s) => s.clips)
-  const clipScripts = useScriptStore((s) => s.clipScripts)
   const isSelected = selectedSegmentId === segment.id
 
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
@@ -123,11 +121,6 @@ export function Segment({ segment, trackType, zoomLevel, scrollOffset, snapTarge
         </span>
       )}
       <div className="segment-label">{segment.label}</div>
-      {clip && clipScripts[clip.id]?.[0] && (
-        <p className="segment-script-preview">
-          {clipScripts[clip.id][0].text.slice(0, 80)}
-        </p>
-      )}
       <div
         className="segment-edge segment-edge-left"
         onPointerDown={isOverlay ? onLeftEdgePointerDown : undefined}

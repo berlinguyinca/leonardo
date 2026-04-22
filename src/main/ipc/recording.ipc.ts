@@ -60,17 +60,20 @@ export function registerRecordingIPC(): void {
       startCapture(args.webviewId)
 
       // Start frame capture → FFmpeg pipeline
+      let frameCaptureWarning: string | undefined
       try {
         startFrameCapture(args.webviewId, videoPath)
       } catch (err) {
-        // Frame capture failed — continue with DOM-only recording
-        console.warn('[Recording] Frame capture failed:', err)
+        const msg = err instanceof Error ? err.message : String(err)
+        console.warn('[Recording] Frame capture failed:', msg)
+        frameCaptureWarning = `Video capture unavailable: ${msg}`
       }
 
       return {
         success: true,
         recordingId,
         outputDir,
+        warning: frameCaptureWarning,
       }
     },
   )

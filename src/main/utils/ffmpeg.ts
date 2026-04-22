@@ -69,5 +69,5 @@ export async function extractThumbnails(
       '-y', thumbPath,
     ])
   }
-  return paths.map((p) => `media:///${p}`)
+  return paths.map((p) => `media://${p}`)
 }

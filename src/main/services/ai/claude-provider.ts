@@ -32,7 +32,6 @@ export class ClaudeProvider implements IAIProvider {
       '--model', this.model,
       '--no-session-persistence',
       '--tools', '',
-      '--bare',
     ]
 
     const result = await runCLI(this.cliPath, args, userMessage)
@@ -64,7 +63,6 @@ export class ClaudeProvider implements IAIProvider {
       '--model', this.model,
       '--no-session-persistence',
       '--tools', '',
-      '--bare',
     ]
 
     const fullOutput = await runCLIStreaming(this.cliPath, args, userMessage, onChunk)
@@ -101,7 +99,6 @@ export class ClaudeProvider implements IAIProvider {
       '--model', this.model,
       '--no-session-persistence',
       '--tools', '',
-      '--bare',
     ]
 
     try {
@@ -132,7 +129,7 @@ export class ClaudeProvider implements IAIProvider {
 
   async testConnection(): Promise<boolean> {
     try {
-      const args = ['-p', '--bare', '--tools', '', '--no-session-persistence', 'ping']
+      const args = ['-p', '--tools', '', '--no-session-persistence', 'ping']
       const result = await runCLI(this.cliPath, args, undefined, 30_000)
       return result.stdout.length > 0
     } catch {

@@ -9,7 +9,7 @@ import { parseOverlayMetadata } from '@shared/types'
 import type { Segment } from '@shared/types'
 
 function filePathToMediaUrl(filePath: string): string {
-  return `media:///${filePath}`
+  return `media://${filePath}`
 }
 
 function findVideoSegmentAt(
