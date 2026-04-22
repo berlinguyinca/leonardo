@@ -113,6 +113,29 @@ describe('TTS IPC handlers', () => {
 
       await expect(invokeHandle('tts:synthesize', args)).rejects.toThrow('synthesis failed')
     })
+
+    it('rejects when args is not an object', async () => {
+      await expect(invokeHandle('tts:synthesize', 'not-an-object')).rejects.toThrow(/args must be an object/)
+    })
+
+    it('rejects when text is missing', async () => {
+      const args = { voice: { id: 'v1', voiceId: 'en-US' }, engine: 'edge-tts' }
+      await expect(invokeHandle('tts:synthesize', args)).rejects.toThrow(/text must be a string/)
+    })
+
+    it('rejects when voice profile is malformed', async () => {
+      const args = { text: 'hi', voice: { name: 'no-id' }, engine: 'edge-tts' }
+      await expect(invokeHandle('tts:synthesize', args)).rejects.toThrow(/invalid voice profile/)
+    })
+
+    it('rejects when engine is not a known value', async () => {
+      const args = {
+        text: 'hi',
+        voice: { id: 'v1', voiceId: 'en-US' },
+        engine: 'bogus-engine',
+      }
+      await expect(invokeHandle('tts:synthesize', args)).rejects.toThrow(/invalid engine "bogus-engine"/)
+    })
   })
 
   describe('tts:list-voices', () => {
@@ -141,6 +164,10 @@ describe('TTS IPC handlers', () => {
       mockGetVoices.mockRejectedValue(new Error('voices fetch failed'))
 
       await expect(invokeHandle('tts:list-voices', 'edge-tts')).rejects.toThrow('voices fetch failed')
+    })
+
+    it('rejects when engine is not a known value', async () => {
+      await expect(invokeHandle('tts:list-voices', 'bogus')).rejects.toThrow(/invalid engine/)
     })
   })
 
@@ -174,6 +201,10 @@ describe('TTS IPC handlers', () => {
       mockTestConnection.mockRejectedValue(new Error('connection error'))
 
       await expect(invokeHandle('tts:test-connection', 'edge-tts')).rejects.toThrow('connection error')
+    })
+
+    it('rejects when engine is not a known value', async () => {
+      await expect(invokeHandle('tts:test-connection', 'bogus')).rejects.toThrow(/invalid engine/)
     })
   })
 })

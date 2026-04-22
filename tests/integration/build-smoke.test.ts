@@ -8,33 +8,27 @@
  * 2. The built output can be loaded without module resolution errors
  * 3. Packages with non-standard main entries (e.g., .ts files) are bundled correctly
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import { execSync } from 'child_process'
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 
 const ROOT = join(__dirname, '../..')
+const BUILD_TIMEOUT_MS = 180_000
 
 describe('build smoke tests', () => {
-  // Run the build once for all tests in this suite
-  let buildOutput: string
-  let buildExitCode: number
-
-  it('electron-vite build completes without errors', () => {
-    try {
-      buildOutput = execSync('npx electron-vite build', {
-        cwd: ROOT,
-        encoding: 'utf-8',
-        timeout: 60_000,
-      })
-      buildExitCode = 0
-    } catch (err) {
-      const execErr = err as { status: number; stdout: string; stderr: string }
-      buildOutput = execErr.stdout + execErr.stderr
-      buildExitCode = execErr.status ?? 1
-    }
-    expect(buildExitCode).toBe(0)
-  })
+  // Run the build once for all tests in this suite. A cold CI build can
+  // exceed the per-test vitest timeout; the larger timeout here covers it,
+  // and failure here fails the entire suite instead of producing a cascade
+  // of misleading ENOENT errors from downstream file-existence tests.
+  beforeAll(() => {
+    execSync('npx electron-vite build', {
+      cwd: ROOT,
+      encoding: 'utf-8',
+      timeout: BUILD_TIMEOUT_MS,
+      stdio: 'pipe',
+    })
+  }, BUILD_TIMEOUT_MS)
 
   it('main bundle exists and is non-empty', () => {
     const mainBundle = join(ROOT, 'out/main/index.js')
