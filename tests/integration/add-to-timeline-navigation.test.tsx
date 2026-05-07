@@ -35,73 +35,31 @@ function makeWebviewRef(): React.RefObject<Electron.WebviewTag | null> {
   } as React.RefObject<Electron.WebviewTag | null>
 }
 
-// ---- MediaRecorder mock ----
-class MockMediaRecorder {
-  state: 'inactive' | 'recording' | 'paused' = 'inactive'
-  stream: MediaStream
-  mimeType: string
-  ondataavailable: ((e: { data: Blob }) => void) | null = null
-  onstop: (() => void) | null = null
-
-  constructor(stream: MediaStream, options?: { mimeType?: string }) {
-    this.stream = stream
-    this.mimeType = options?.mimeType ?? 'video/webm'
-  }
-
-  start(timeslice?: number) {
-    this.state = 'recording'
-    if (timeslice) {
-      setTimeout(() => {
-        this.ondataavailable?.({ data: new Blob(['chunk'], { type: 'video/webm' }) })
-      }, timeslice)
-    }
-  }
-
-  stop() {
-    this.state = 'inactive'
-    this.onstop?.()
-  }
-}
-
-function makeMockStream(): MediaStream {
-  const track = { stop: vi.fn(), kind: 'video' } as unknown as MediaStreamTrack
-  return {
-    getTracks: () => [track],
-    getVideoTracks: () => [track],
-    getAudioTracks: () => [],
-  } as unknown as MediaStream
-}
-
 function setupWindowMock() {
   ;(window as Record<string, unknown>)['leonardo'] = {
     recording: {
-      start: vi.fn().mockResolvedValue(undefined),
+      start: vi.fn().mockResolvedValue({ success: true, recordingId: 'rec-1' }),
       stop: vi.fn().mockResolvedValue({
         success: true,
         recordingId: 'rec-1',
+        videoPath: '/tmp/recordings/rec-1/rec-1.mp4',
         outputDir: '/tmp/recordings/rec-1',
         duration: 5000,
       }),
-      pause: vi.fn(),
-      resume: vi.fn(),
-      saveBlob: vi.fn().mockResolvedValue({
-        success: true,
-        webmPath: '/tmp/recordings/rec-1/recording.webm',
-      }),
-      convert: vi.fn().mockResolvedValue({
-        success: true,
-        videoPath: '/tmp/recordings/rec-1/recording.mp4',
-        eventsPath: '/tmp/recordings/rec-1/recording.events.json',
-      }),
+      pause: vi.fn().mockResolvedValue({ success: true }),
+      resume: vi.fn().mockResolvedValue({ success: true }),
       relayDomEvent: vi.fn(),
       getWebviewPreloadPath: vi.fn().mockResolvedValue('/path/to/webview-preload.js'),
+    },
+    clip: {
+      create: vi.fn().mockImplementation((clip: unknown) => Promise.resolve(clip)),
     },
   }
 }
 
 describe('add to timeline — view navigation', () => {
   beforeEach(() => {
-    useUIStore.setState({ editorView: 'dual-pane', timelineCollapsed: true })
+    useUIStore.setState({ editorView: 'inline', timelineCollapsed: true })
     useTimelineStore.setState({ addClipToTimeline: vi.fn() } as any)
     useLibraryStore.setState({ clips: [], highlightedClipId: null })
     useProjectStore.setState({ activeProjectId: 'proj-1' } as any)
@@ -134,40 +92,25 @@ describe('add to timeline — view navigation', () => {
   describe('RecordingControls "Edit Now"', () => {
     beforeEach(() => {
       setupWindowMock()
-      vi.stubGlobal('MediaRecorder', MockMediaRecorder)
-      vi.stubGlobal('navigator', {
-        ...navigator,
-        mediaDevices: {
-          getDisplayMedia: vi.fn().mockResolvedValue(makeMockStream()),
-        },
-      })
       useRecordingStore.setState({
         status: 'idle',
         currentUrl: 'https://example.com',
         recordingDuration: 5000,
         targetResolution: { width: 1920, height: 1080 },
       })
-      vi.useFakeTimers()
     })
 
     afterEach(() => {
-      vi.useRealTimers()
       vi.clearAllMocks()
-      vi.unstubAllGlobals()
+      delete (window as Record<string, unknown>)['leonardo']
     })
 
     async function triggerStop() {
       useRecordingStore.setState({ status: 'idle' })
       render(<RecordingControls webviewRef={makeWebviewRef()} />)
-      // Click Record to initialize the MediaRecorder
       await act(async () => {
         fireEvent.click(screen.getByText('Record'))
       })
-      // Advance past the MediaRecorder timeslice so a data chunk is captured
-      await act(async () => {
-        vi.advanceTimersByTime(1100)
-      })
-      // Click Stop
       await act(async () => {
         fireEvent.click(screen.getByText('Stop'))
       })
@@ -190,12 +133,12 @@ describe('add to timeline — view navigation', () => {
     })
 
     it('switches workspace to editing preset on "Edit Now"', async () => {
-      useUIStore.setState({ editorView: 'dual-pane', timelineCollapsed: true, workspacePreset: 'recording' })
+      useUIStore.setState({ editorView: 'inline', timelineCollapsed: true, workspacePreset: 'recording' })
       await triggerStop()
       act(() => {
         fireEvent.click(screen.getByText('Edit Now'))
       })
-      expect(useUIStore.getState().workspacePreset).toBe('editing')
+      expect(useUIStore.getState().workspacePreset).toBe('script')
     })
   })
 })

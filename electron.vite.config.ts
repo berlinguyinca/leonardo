@@ -4,11 +4,16 @@ import { resolve } from 'path'
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin({ exclude: ['msedge-tts'] })],
     resolve: {
       alias: {
         '@shared': resolve('src/shared'),
         '@main': resolve('src/main'),
+      },
+    },
+    build: {
+      rollupOptions: {
+        external: ['bufferutil', 'utf-8-validate'],
       },
     },
   },

@@ -3,11 +3,16 @@ import type { WorkspacePreset } from '../../stores/ui-store'
 import { useUIStore } from '../../stores/ui-store'
 import { useScriptStore } from '../../stores/script-store'
 import { RecordingBrowser } from '../browser/RecordingBrowser'
+import { PlaybackPanel } from '../preview/PlaybackPanel'
 import { PropertiesPanel } from '../properties/PropertiesPanel'
 import { ScriptOnlyView } from '../script-editor/ScriptOnlyView'
-import { DualPaneView } from '../script-editor/DualPaneView'
 import { InlineEditorView } from '../script-editor/InlineEditorView'
 import { ClipLibrary } from '../clip-library/ClipLibrary'
+import { ComposeView } from '../compose/ComposeView'
+import { ScriptTimelineView } from '../script-editor/ScriptTimelineView'
+import { ScriptEditorPanel } from '../script-editor/ScriptEditorPanel'
+import { EffectsCanvas } from '../effects/EffectsCanvas'
+import { Timeline } from '../timeline/Timeline'
 
 const COLLAPSED_SIZE = 36
 
@@ -68,6 +73,88 @@ export function PanelSystem({ preset }: PanelSystemProps): React.ReactNode {
 
   const effectiveTimelineHeight = timelineCollapsed ? COLLAPSED_SIZE : timelineHeight
 
+  // Script preset: two-column layout — editor left, video + toolbar + log + timeline right
+  if (preset === 'script') {
+    return (
+      <div className="panel-system script-layout">
+        {/* Left: Script Editor */}
+        <div className="script-left-panel" style={{ width: `${sidebarWidth}px`, minWidth: 250 }}>
+          <ScriptEditorPanel />
+        </div>
+
+        {/* Resizable divider */}
+        <div
+          className="resize-handle resize-handle-v script-split-divider"
+          onMouseDown={handleMouseDown('sidebar')}
+        />
+
+        {/* Right: Video + Toolbar + Generation Log + Compact Timeline */}
+        <div className="script-right-panel" style={{ flex: 1 }}>
+          <ScriptTimelineView />
+        </div>
+      </div>
+    )
+  }
+
+  // Effects preset: canvas + properties + timeline
+  if (preset === 'effects') {
+    return (
+      <div className="panel-system">
+        <div className="panel-main" style={{ width: '100%' }}>
+          <div className="panel-top" style={{ height: `calc(100% - ${effectiveTimelineHeight}px - 4px)` }}>
+            <div className="panel panel-preview" style={{ flex: 1 }}>
+              <div className="panel-header">Effects Canvas</div>
+              <div className="panel-content">
+                <EffectsCanvas />
+              </div>
+            </div>
+            <div
+              className={`panel panel-properties ${propertiesCollapsed ? 'panel-collapsed' : ''}`}
+              style={{ width: propertiesCollapsed ? COLLAPSED_SIZE : 300 }}
+            >
+              <div
+                className="panel-header panel-header-toggle"
+                onClick={() => setPropertiesCollapsed(!propertiesCollapsed)}
+              >
+                <span className={`collapse-chevron ${propertiesCollapsed ? 'chevron-left' : 'chevron-right'}`}>
+                  {propertiesCollapsed ? '\u25C0' : '\u25B6'}
+                </span>
+                {!propertiesCollapsed && <span>Properties</span>}
+              </div>
+              {!propertiesCollapsed && (
+                <div className="panel-content">
+                  <PropertiesPanel />
+                </div>
+              )}
+            </div>
+          </div>
+          {!timelineCollapsed && (
+            <div className="resize-handle resize-handle-h" onMouseDown={handleMouseDown('timeline')} />
+          )}
+          <div
+            className={`panel panel-timeline ${timelineCollapsed ? 'panel-collapsed' : ''}`}
+            style={{ height: effectiveTimelineHeight }}
+          >
+            <div
+              className="panel-header panel-header-toggle"
+              onClick={() => setTimelineCollapsed(!timelineCollapsed)}
+            >
+              <span className={`collapse-chevron ${timelineCollapsed ? 'chevron-up' : 'chevron-down'}`}>
+                {timelineCollapsed ? '\u25B2' : '\u25BC'}
+              </span>
+              <span>Timeline</span>
+            </div>
+            {!timelineCollapsed && (
+              <div className="panel-content">
+                <Timeline />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="panel-system">
       {/* Left Sidebar - Clip Library */}
@@ -102,14 +189,12 @@ export function PanelSystem({ preset }: PanelSystemProps): React.ReactNode {
         <div className="panel-top" style={{ height: `calc(100% - ${effectiveTimelineHeight}px - 4px)` }}>
           <div className="panel panel-preview">
             <div className="panel-header">
-              {preset === 'recording' ? 'Browser' : 'Preview'}
+              {preset === 'recording' ? 'Browser' : preset === 'compose' ? 'Compose' : 'Preview'}
             </div>
             <div className="panel-content">
-              {preset === 'recording' ? (
-                <RecordingBrowser />
-              ) : (
-                <p className="panel-placeholder">Video Preview</p>
-              )}
+              {preset === 'recording' && <RecordingBrowser />}
+              {preset === 'compose' && <ComposeView />}
+              {preset === 'export' && <PlaybackPanel />}
             </div>
           </div>
 
@@ -135,12 +220,12 @@ export function PanelSystem({ preset }: PanelSystemProps): React.ReactNode {
           </div>
         </div>
 
-        {/* Timeline Resize Handle — editing/export only */}
+        {/* Timeline Resize Handle — compose/export only */}
         {preset !== 'recording' && !timelineCollapsed && (
           <div className="resize-handle resize-handle-h" onMouseDown={handleMouseDown('timeline')} />
         )}
 
-        {/* Bottom Section - Timeline — editing/export only */}
+        {/* Bottom Section - Timeline — compose/export only */}
         {preset !== 'recording' && <div
           className={`panel panel-timeline ${timelineCollapsed ? 'panel-collapsed' : ''}`}
           style={{ height: effectiveTimelineHeight }}
@@ -156,11 +241,9 @@ export function PanelSystem({ preset }: PanelSystemProps): React.ReactNode {
           </div>
           {!timelineCollapsed && (
             <div className="panel-content">
+              <Timeline />
               {editorView === 'script-only' && (
                 <ScriptOnlyView sections={sections} onUpdateSection={updateSection} />
-              )}
-              {editorView === 'dual-pane' && (
-                <DualPaneView sections={sections} onUpdateSection={updateSection} />
               )}
               {editorView === 'inline' && (
                 <InlineEditorView />

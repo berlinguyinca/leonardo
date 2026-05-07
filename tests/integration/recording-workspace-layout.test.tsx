@@ -19,11 +19,17 @@ vi.mock('@renderer/components/clip-library/ClipLibrary', () => ({
 vi.mock('@renderer/components/script-editor/ScriptOnlyView', () => ({
   ScriptOnlyView: () => <div data-testid="script-only">Script</div>,
 }))
-vi.mock('@renderer/components/script-editor/DualPaneView', () => ({
-  DualPaneView: () => <div data-testid="dual-pane">DualPane</div>,
-}))
 vi.mock('@renderer/components/script-editor/InlineEditorView', () => ({
   InlineEditorView: () => <div data-testid="inline-editor">InlineEditor</div>,
+}))
+vi.mock('@renderer/components/compose/ComposeView', () => ({
+  ComposeView: () => <div data-testid="compose-view">ComposeView</div>,
+}))
+vi.mock('@renderer/components/script-view/ScriptPresetView', () => ({
+  ScriptPresetView: () => <div data-testid="script-preset-view">ScriptPresetView</div>,
+}))
+vi.mock('@renderer/components/preview/PlaybackPanel', () => ({
+  PlaybackPanel: () => <div data-testid="playback-panel">PlaybackPanel</div>,
 }))
 
 describe('recording workspace layout', () => {
@@ -57,14 +63,14 @@ describe('recording workspace layout', () => {
     })
   })
 
-  describe('PanelSystem in editing preset', () => {
+  describe('PanelSystem in compose preset', () => {
     it('renders the timeline panel', () => {
-      const { container } = render(<PanelSystem preset="editing" />)
+      const { container } = render(<PanelSystem preset="compose" />)
       expect(container.querySelector('.panel-timeline')).not.toBeNull()
     })
 
     it('renders the timeline resize handle', () => {
-      const { container } = render(<PanelSystem preset="editing" />)
+      const { container } = render(<PanelSystem preset="compose" />)
       expect(container.querySelector('.resize-handle-h')).not.toBeNull()
     })
   })
@@ -76,16 +82,16 @@ describe('recording workspace layout', () => {
       expect(screen.queryByRole('tablist', { name: 'Editor view' })).toBeNull()
     })
 
-    it('renders ViewModeToggle in editing mode', () => {
-      useUIStore.setState({ workspacePreset: 'editing' })
+    it('renders ViewModeToggle in compose mode', () => {
+      useUIStore.setState({ workspacePreset: 'compose' })
       render(<Toolbar />)
       expect(screen.getByRole('tablist', { name: 'Editor view' })).toBeTruthy()
     })
 
-    it('renders ViewModeToggle in export mode', () => {
+    it('does not render ViewModeToggle in export mode', () => {
       useUIStore.setState({ workspacePreset: 'export' })
       render(<Toolbar />)
-      expect(screen.getByRole('tablist', { name: 'Editor view' })).toBeTruthy()
+      expect(screen.queryByRole('tablist', { name: 'Editor view' })).toBeNull()
     })
   })
 })

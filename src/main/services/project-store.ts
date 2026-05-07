@@ -5,6 +5,7 @@ import { DB_FILENAME } from '@shared/constants'
 import type { Project, InputModeType, Resolution } from '@shared/types'
 import type { Clip } from '@shared/types/events'
 import type { Script, ScriptSection } from '@shared/types/ai'
+import type { SyncTimeline, Track, Segment, SyncPoint } from '@shared/types'
 
 let db: Database.Database | null = null
 
@@ -109,6 +110,52 @@ function runMigrations(db: Database.Database): void {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS timelines (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL UNIQUE,
+      duration REAL NOT NULL DEFAULT 0,
+      reviewed INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS tracks (
+      id TEXT PRIMARY KEY,
+      timeline_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      z_order INTEGER NOT NULL DEFAULT 0,
+      label TEXT NOT NULL DEFAULT '',
+      muted INTEGER NOT NULL DEFAULT 0,
+      locked INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (timeline_id) REFERENCES timelines(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS segments (
+      id TEXT PRIMARY KEY,
+      track_id TEXT NOT NULL,
+      start_time REAL NOT NULL,
+      end_time REAL NOT NULL,
+      source_file TEXT NOT NULL,
+      source_offset REAL NOT NULL DEFAULT 0,
+      label TEXT NOT NULL DEFAULT '',
+      FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS sync_points (
+      id TEXT PRIMARY KEY,
+      timeline_id TEXT NOT NULL,
+      timestamp REAL NOT NULL,
+      type TEXT NOT NULL,
+      source TEXT NOT NULL,
+      duration REAL NOT NULL DEFAULT 0,
+      coordinates TEXT,
+      annotation_text TEXT,
+      transition_type TEXT,
+      confidence REAL NOT NULL DEFAULT 0,
+      FOREIGN KEY (timeline_id) REFERENCES timelines(id) ON DELETE CASCADE
+    );
   `)
 
   // Idempotent column additions for clips table (added in v2)
@@ -123,6 +170,23 @@ function runMigrations(db: Database.Database): void {
   // Idempotent column additions for scripts table (added in v3)
   for (const sql of [
     `ALTER TABLE scripts ADD COLUMN clip_id TEXT REFERENCES clips(id) ON DELETE SET NULL`,
+  ]) {
+    try { db.exec(sql) } catch { /* column already exists */ }
+  }
+
+  // Idempotent column additions for script_sections table (added in v4)
+  for (const sql of [
+    `ALTER TABLE script_sections ADD COLUMN event_ids TEXT NOT NULL DEFAULT '[]'`,
+    `ALTER TABLE script_sections ADD COLUMN action_markers TEXT NOT NULL DEFAULT '[]'`,
+    `ALTER TABLE script_sections ADD COLUMN freeze_override_duration REAL DEFAULT NULL`,
+  ]) {
+    try { db.exec(sql) } catch { /* column already exists */ }
+  }
+
+  // Idempotent column additions for segments table (added in v5)
+  for (const sql of [
+    `ALTER TABLE segments ADD COLUMN metadata TEXT DEFAULT NULL`,
+    `ALTER TABLE segments ADD COLUMN source_duration REAL DEFAULT NULL`,
   ]) {
     try { db.exec(sql) } catch { /* column already exists */ }
   }
@@ -286,9 +350,9 @@ export function saveScript(script: Script, clipId?: string): Script {
     db.prepare(`INSERT OR REPLACE INTO scripts (id, project_id, ai_backend_used, prompt, generated_at, clip_id) VALUES (?, ?, ?, ?, ?, ?)`)
       .run(script.id, script.projectId, script.aiBackendUsed, script.prompt, script.generatedAt, clipId ?? script.clipId ?? null)
     db.prepare('DELETE FROM script_sections WHERE script_id = ?').run(script.id)
-    const insertSection = db.prepare(`INSERT INTO script_sections (id, script_id, text, voice_profile_id, start_time, end_time, timing_markers, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    const insertSection = db.prepare(`INSERT INTO script_sections (id, script_id, text, voice_profile_id, start_time, end_time, timing_markers, sort_order, event_ids, action_markers, freeze_override_duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     for (const section of script.sections) {
-      insertSection.run(section.id, script.id, section.text, section.voiceProfileId ?? null, section.startTime, section.endTime, JSON.stringify(section.timingMarkers), section.order)
+      insertSection.run(section.id, script.id, section.text, section.voiceProfileId ?? null, section.startTime, section.endTime, JSON.stringify(section.timingMarkers), section.order, JSON.stringify(section.eventIds ?? []), JSON.stringify(section.actionMarkers ?? []), section.freezeOverrideDuration ?? null)
     }
   })()
   return { ...script, clipId: clipId ?? script.clipId }
@@ -323,6 +387,9 @@ export function listScriptsByProject(
       endTime: sr.end_time as number,
       timingMarkers: JSON.parse((sr.timing_markers as string) || '[]'),
       order: sr.sort_order as number,
+      eventIds: JSON.parse((sr.event_ids as string) || '[]'),
+      actionMarkers: JSON.parse((sr.action_markers as string) || '[]'),
+      freezeOverrideDuration: (sr.freeze_override_duration as number) ?? null,
     })
   }
 
@@ -335,4 +402,138 @@ export function listScriptsByProject(
     generatedAt: row.generated_at as string,
     sections: sectionsByScriptId.get(row.id as string) ?? [],
   }))
+}
+
+export function deleteScriptsForClip(clipId: string): void {
+  const db = getDatabase()
+  db.prepare('DELETE FROM scripts WHERE clip_id = ?').run(clipId)
+}
+
+// --- Timeline CRUD ---
+
+export function saveTimeline(timeline: SyncTimeline): void {
+  const db = getDatabase()
+  const now = new Date().toISOString()
+
+  db.transaction(() => {
+    // Upsert timeline row
+    db.prepare(`INSERT OR REPLACE INTO timelines (id, project_id, duration, reviewed, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)`).run(
+      timeline.id, timeline.projectId, timeline.duration,
+      timeline.reviewed ? 1 : 0, now, now,
+    )
+
+    // Clear old nested data
+    db.prepare('DELETE FROM sync_points WHERE timeline_id = ?').run(timeline.id)
+    const oldTrackIds = db.prepare('SELECT id FROM tracks WHERE timeline_id = ?')
+      .all(timeline.id) as { id: string }[]
+    for (const { id } of oldTrackIds) {
+      db.prepare('DELETE FROM segments WHERE track_id = ?').run(id)
+    }
+    db.prepare('DELETE FROM tracks WHERE timeline_id = ?').run(timeline.id)
+
+    // Insert tracks and segments
+    const insertTrack = db.prepare(`INSERT INTO tracks (id, timeline_id, type, z_order, label, muted, locked)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    const insertSegment = db.prepare(`INSERT INTO segments (id, track_id, start_time, end_time, source_file, source_offset, source_duration, label, metadata)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+
+    for (const track of timeline.tracks) {
+      insertTrack.run(track.id, timeline.id, track.type, track.zOrder, track.label,
+        track.muted ? 1 : 0, track.locked ? 1 : 0)
+      for (const seg of track.segments) {
+        insertSegment.run(seg.id, track.id, seg.startTime, seg.endTime,
+          seg.sourceFile, seg.sourceOffset, seg.sourceDuration ?? null, seg.label, seg.metadata ?? null)
+      }
+    }
+
+    // Insert sync points
+    const insertSyncPoint = db.prepare(`INSERT INTO sync_points
+      (id, timeline_id, timestamp, type, source, duration, coordinates, annotation_text, transition_type, confidence)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+
+    for (const sp of timeline.syncPoints) {
+      insertSyncPoint.run(sp.id, timeline.id, sp.timestamp, sp.type, sp.source, sp.duration,
+        sp.coordinates ? JSON.stringify(sp.coordinates) : null,
+        sp.annotationText ?? null,
+        sp.transitionType ?? null,
+        sp.confidence)
+    }
+  })()
+}
+
+export function getTimeline(projectId: string): SyncTimeline | null {
+  const db = getDatabase()
+
+  const tlRow = db.prepare('SELECT * FROM timelines WHERE project_id = ?').get(projectId) as
+    Record<string, unknown> | undefined
+  if (!tlRow) return null
+
+  const timelineId = tlRow.id as string
+
+  // Load tracks
+  const trackRows = db.prepare('SELECT * FROM tracks WHERE timeline_id = ? ORDER BY z_order ASC')
+    .all(timelineId) as Record<string, unknown>[]
+
+  const tracks: Track[] = trackRows.map((tr) => {
+    const segRows = db.prepare('SELECT * FROM segments WHERE track_id = ? ORDER BY start_time ASC')
+      .all(tr.id as string) as Record<string, unknown>[]
+
+    const segments: Segment[] = segRows.map((sr) => ({
+      id: sr.id as string,
+      trackId: sr.track_id as string,
+      startTime: sr.start_time as number,
+      endTime: sr.end_time as number,
+      sourceFile: sr.source_file as string,
+      sourceOffset: sr.source_offset as number,
+      sourceDuration: (sr.source_duration as number) ?? undefined,
+      label: sr.label as string,
+      metadata: (sr.metadata as string) ?? undefined,
+    }))
+
+    return {
+      id: tr.id as string,
+      type: tr.type as Track['type'],
+      segments,
+      zOrder: tr.z_order as number,
+      label: tr.label as string,
+      muted: (tr.muted as number) === 1,
+      locked: (tr.locked as number) === 1,
+    }
+  })
+
+  // Load sync points
+  const spRows = db.prepare('SELECT * FROM sync_points WHERE timeline_id = ? ORDER BY timestamp ASC')
+    .all(timelineId) as Record<string, unknown>[]
+
+  const syncPoints: SyncPoint[] = spRows.map((sp) => ({
+    id: sp.id as string,
+    timelineId: sp.timeline_id as string,
+    timestamp: sp.timestamp as number,
+    type: sp.type as SyncPoint['type'],
+    source: sp.source as SyncPoint['source'],
+    duration: sp.duration as number,
+    coordinates: sp.coordinates ? JSON.parse(sp.coordinates as string) : undefined,
+    annotationText: (sp.annotation_text as string) ?? undefined,
+    transitionType: (sp.transition_type as SyncPoint['transitionType']) ?? undefined,
+    confidence: sp.confidence as number,
+  }))
+
+  return {
+    id: timelineId,
+    projectId: tlRow.project_id as string,
+    tracks,
+    syncPoints,
+    duration: tlRow.duration as number,
+    reviewed: (tlRow.reviewed as number) === 1,
+  }
+}
+
+export function deleteTimeline(projectId: string): boolean {
+  const db = getDatabase()
+  const tlRow = db.prepare('SELECT id FROM timelines WHERE project_id = ?').get(projectId) as
+    { id: string } | undefined
+  if (!tlRow) return false
+  db.prepare('DELETE FROM timelines WHERE id = ?').run(tlRow.id)
+  return true
 }

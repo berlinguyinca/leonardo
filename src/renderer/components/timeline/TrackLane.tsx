@@ -14,6 +14,7 @@ interface TrackLaneProps {
   scrollOffset: number
   onToggleMute: () => void
   onToggleLock: () => void
+  onSeek: (timeMs: number) => void
 }
 
 export function TrackLane({
@@ -23,11 +24,20 @@ export function TrackLane({
   scrollOffset,
   onToggleMute,
   onToggleLock,
+  onSeek,
 }: TrackLaneProps): React.ReactNode {
   const snapTargets = track.segments.flatMap((s) => [s.startTime, s.endTime])
   const trackContentRef = useRef<HTMLDivElement>(null)
   const clips = useLibraryStore((state) => state.clips)
   const addClipToTimeline = useTimelineStore((state) => state.addClipToTimeline)
+
+  function handleClick(e: React.MouseEvent<HTMLDivElement>): void {
+    if (track.locked) return
+    const rect = trackContentRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const time = pixelToTime(e.clientX - rect.left, zoomLevel, scrollOffset)
+    onSeek(Math.max(0, time))
+  }
 
   function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {
     if (track.locked) return
@@ -50,11 +60,12 @@ export function TrackLane({
   }
 
   return (
-    <div className={`track-lane${track.type === 'audio' ? ' track-audio' : ''}`} data-track-id={track.id}>
+    <div className={`track-lane${track.type === 'audio' ? ' track-audio' : ''}${track.type === 'overlay' ? ' track-overlay' : ''}`} data-track-id={track.id}>
       <TrackHeader track={track} onToggleMute={onToggleMute} onToggleLock={onToggleLock} />
       <div
         className="track-content"
         ref={trackContentRef}
+        onClick={handleClick}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
       >
@@ -62,6 +73,7 @@ export function TrackLane({
           <Segment
             key={seg.id}
             segment={seg}
+            trackType={track.type}
             zoomLevel={zoomLevel}
             scrollOffset={scrollOffset}
             snapTargets={snapTargets}

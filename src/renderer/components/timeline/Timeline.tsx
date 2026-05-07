@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useTimelineStore } from '../../stores/timeline-store'
 import { useLibraryStore } from '../../stores/library-store'
+import { useUIStore } from '../../stores/ui-store'
 import { usePlayhead } from '../../hooks/usePlayhead'
 import { useTimelineZoom } from '../../hooks/useTimelineZoom'
+import { playheadEmitter } from '../../hooks/PlayheadEmitter'
 import { timeToPixel } from './timeline-utils'
 import { TimeRuler } from './TimeRuler'
 import { Playhead } from './Playhead'
@@ -10,6 +12,9 @@ import { TrackLane } from './TrackLane'
 import { ScrollContainer } from './ScrollContainer'
 import { ZoomControls } from './ZoomControls'
 import { TransportControls } from './TransportControls'
+import { ScriptTextTrack } from './ScriptTextTrack'
+
+const FRAME_MS = Math.round(1000 / 15) // 1 frame at 15fps capture rate
 
 function EmptyTimelineDropZone(): React.ReactNode {
   const clips = useLibraryStore((s) => s.clips)
@@ -48,9 +53,33 @@ function EmptyTimelineDropZone(): React.ReactNode {
   )
 }
 
+function jumpSegmentBoundary(dir: 'prev' | 'next'): void {
+  const s = useTimelineStore.getState()
+  const pos = s.playheadPosition
+  const boundaries = Array.from(
+    new Set(
+      (s.timeline?.tracks ?? []).flatMap((t) =>
+        t.segments.flatMap((seg) => [seg.startTime, seg.endTime]),
+      ),
+    ),
+  ).sort((a, b) => a - b)
+
+  const target =
+    dir === 'next'
+      ? boundaries.find((b) => b > pos)
+      : [...boundaries].reverse().find((b) => b < pos)
+
+  if (target !== undefined) {
+    s.setPlayheadPosition(target)
+    playheadEmitter.emit('position', target)
+  }
+}
+
 export function Timeline(): React.ReactNode {
   const timeline = useTimelineStore((s) => s.timeline)
   const zoomLevel = useTimelineStore((s) => s.zoomLevel)
+  const workspacePreset = useUIStore((s) => s.workspacePreset)
+  const containerRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [scrollOffset, setScrollOffset] = useState(0)
   const [visibleWidth] = useState(800)
@@ -65,23 +94,112 @@ export function Timeline(): React.ReactNode {
     setScrollOffset(scrollLeft)
   }, [])
 
-  const handleDeselect = useCallback(() => {
+  const handleDeselect = useCallback((e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('.timeline-segment')) return
     useTimelineStore.getState().setSelectedSyncPoint(null)
     useTimelineStore.getState().setSelectedSegment(null)
   }, [])
 
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-      if (e.key !== 'Delete' && e.key !== 'Backspace') return
+  // Focus the timeline container on click so keyboard events are scoped here
+  const handleContainerClick = useCallback((e: React.MouseEvent) => {
+    handleDeselect(e)
+    containerRef.current?.focus()
+  }, [handleDeselect])
+
+  // Timeline-scoped keyboard shortcuts — only fire when this container has focus
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+
+    // Arrow Left/Right — step 1 frame
+    if (e.key === 'ArrowRight') {
+      e.preventDefault()
+      const s = useTimelineStore.getState()
+      s.setIsPlaying(false)
+      const newPos = Math.min(s.timeline?.duration ?? 0, s.playheadPosition + FRAME_MS)
+      s.setPlayheadPosition(newPos)
+      playheadEmitter.emit('position', newPos)
+      return
+    }
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault()
+      const s = useTimelineStore.getState()
+      s.setIsPlaying(false)
+      const newPos = Math.max(0, s.playheadPosition - FRAME_MS)
+      s.setPlayheadPosition(newPos)
+      playheadEmitter.emit('position', newPos)
+      return
+    }
+
+    // Arrow Up/Down — jump to previous/next clip boundary
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      jumpSegmentBoundary('next')
+      return
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      jumpSegmentBoundary('prev')
+      return
+    }
+
+    // J/K/L — variable-speed transport (DaVinci Resolve style)
+    if (e.key === 'l') {
+      const s = useTimelineStore.getState()
+      const next = s.isPlaying && s.playbackRate > 0 ? Math.min(s.playbackRate * 2, 8) : 1
+      s.setPlaybackRate(next)
+      s.setIsPlaying(true)
+      return
+    }
+    if (e.key === 'k') {
+      const s = useTimelineStore.getState()
+      s.setIsPlaying(false)
+      s.setPlaybackRate(1)
+      return
+    }
+    if (e.key === 'j') {
+      const s = useTimelineStore.getState()
+      const next = s.isPlaying && s.playbackRate < 0 ? Math.max(s.playbackRate * 2, -8) : -1
+      s.setPlaybackRate(next)
+      s.setIsPlaying(true)
+      return
+    }
+
+    // Home/End — jump to start/end
+    if (e.key === 'Home') {
+      useTimelineStore.getState().setPlayheadPosition(0)
+      playheadEmitter.emit('position', 0)
+      return
+    }
+    if (e.key === 'End') {
+      const dur = useTimelineStore.getState().timeline?.duration ?? 0
+      useTimelineStore.getState().setPlayheadPosition(dur)
+      playheadEmitter.emit('position', dur)
+      return
+    }
+
+    // +/- — zoom
+    if (e.key === '+' || e.key === '=') {
+      useTimelineStore.getState().setZoomLevel(
+        Math.min(10, useTimelineStore.getState().zoomLevel * 1.2),
+      )
+      return
+    }
+    if (e.key === '-') {
+      useTimelineStore.getState().setZoomLevel(
+        Math.max(0.1, useTimelineStore.getState().zoomLevel / 1.2),
+      )
+      return
+    }
+
+    // Delete/Backspace — remove selected segment
+    if (e.key === 'Delete' || e.key === 'Backspace') {
       const { selectedSegmentId, removeSegment, setSelectedSegment } = useTimelineStore.getState()
       if (!selectedSegmentId) return
       e.preventDefault()
       removeSegment(selectedSegmentId)
       setSelectedSegment(null)
+      return
     }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
   }, [])
 
   if (!timeline) {
@@ -89,9 +207,15 @@ export function Timeline(): React.ReactNode {
   }
 
   return (
-    <div className="timeline-container" onClick={handleDeselect}>
+    <div
+      ref={containerRef}
+      className="timeline-container"
+      tabIndex={0}
+      onClick={handleContainerClick}
+      onKeyDown={handleKeyDown}
+    >
       <div className="timeline-header">
-        <TransportControls />
+        <TransportControls seekTo={seekTo} />
         <ZoomControls
           onZoomIn={() => zoom('in')}
           onZoomOut={() => zoom('out')}
@@ -122,8 +246,12 @@ export function Timeline(): React.ReactNode {
             scrollOffset={scrollOffset}
             onToggleMute={() => {}}
             onToggleLock={() => {}}
+            onSeek={seekTo}
           />
         ))}
+        {workspacePreset !== 'script' && (
+          <ScriptTextTrack zoomLevel={zoomLevel} scrollLeft={scrollOffset} />
+        )}
       </ScrollContainer>
     </div>
   )

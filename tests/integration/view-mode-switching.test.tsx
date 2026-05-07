@@ -6,20 +6,19 @@ import { ViewModeToggle } from '@renderer/components/layout/ViewModeToggle'
 
 describe('ViewModeToggle (integration)', () => {
   beforeEach(() => {
-    useUIStore.setState({ editorView: 'dual-pane' })
+    useUIStore.setState({ editorView: 'inline' })
   })
 
-  it('renders three view buttons', () => {
+  it('renders two view buttons', () => {
     render(<ViewModeToggle />)
     expect(screen.getByText('Script')).toBeDefined()
-    expect(screen.getByText('Split')).toBeDefined()
     expect(screen.getByText('Timeline')).toBeDefined()
   })
 
   it('highlights the active view', () => {
     render(<ViewModeToggle />)
-    const splitBtn = screen.getByText('Split')
-    expect(splitBtn.classList.contains('active')).toBe(true)
+    const timelineBtn = screen.getByText('Timeline')
+    expect(timelineBtn.classList.contains('active')).toBe(true)
   })
 
   it('switches view on click and updates store', () => {
@@ -39,16 +38,13 @@ describe('ViewModeToggle (integration)', () => {
     expect(scriptBtn.classList.contains('active')).toBe(true)
   })
 
-  it('supports keyboard shortcut Cmd+1/2/3', () => {
+  it('supports keyboard shortcut Cmd+1/2', () => {
     render(<ViewModeToggle />)
 
     fireEvent.keyDown(window, { key: '1', metaKey: true })
     expect(useUIStore.getState().editorView).toBe('script-only')
 
     fireEvent.keyDown(window, { key: '2', metaKey: true })
-    expect(useUIStore.getState().editorView).toBe('dual-pane')
-
-    fireEvent.keyDown(window, { key: '3', metaKey: true })
     expect(useUIStore.getState().editorView).toBe('inline')
   })
 })

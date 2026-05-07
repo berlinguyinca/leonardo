@@ -23,7 +23,7 @@ export class OllamaProvider implements IAIProvider {
 
   async generateScript(prompt: string, context: ScriptGenContext): Promise<Script> {
     const scriptId = uuidv4()
-    const userMessage = buildScriptPrompt(context)
+    const userMessage = `${prompt}\n\n${buildScriptPrompt(context)}`
 
     const response = await this.chat([
       { role: 'system', content: getSystemPrompt() },
@@ -42,25 +42,111 @@ export class OllamaProvider implements IAIProvider {
     }
   }
 
-  async refineSyncPoints(script: Script, domEvents: DOMEvent[]): Promise<SyncPoint[]> {
-    const response = await this.chat([
-      {
-        role: 'system',
-        content: 'You are a video sync point analyzer. Output JSON array of sync points.',
-      },
-      {
-        role: 'user',
-        content: `Script:\n${script.sections.map((s) => s.text).join('\n\n')}\n\nDOM events:\n${JSON.stringify(domEvents.slice(0, 50), null, 2)}\n\nReturn a JSON array of sync points.`,
-      },
-    ])
+  async generateScriptStream(
+    prompt: string,
+    context: ScriptGenContext,
+    onChunk: (chunk: string) => void,
+  ): Promise<Script> {
+    const scriptId = uuidv4()
+    const userMessage = `${prompt}\n\n${buildScriptPrompt(context)}`
 
+    const streamController = new AbortController()
+    const streamTimer = setTimeout(() => streamController.abort(), 120_000)
+    let response: Response
     try {
+      response = await fetch(`${this.baseUrl}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: this.model,
+          messages: [
+            { role: 'system', content: getSystemPrompt() },
+            { role: 'user', content: userMessage },
+          ],
+          stream: true,
+        }),
+        signal: streamController.signal,
+      })
+    } finally {
+      clearTimeout(streamTimer)
+    }
+
+    if (!response.ok) {
+      throw new Error(`Ollama API error: ${response.status} ${response.statusText}`)
+    }
+
+    let fullText = ''
+    const reader = response.body?.getReader()
+    if (!reader) {
+      throw new Error('Ollama response body is not readable')
+    }
+
+    const decoder = new TextDecoder()
+    let done = false
+    while (!done) {
+      const result = await reader.read()
+      done = result.done
+      if (result.value) {
+        const chunk = decoder.decode(result.value, { stream: true })
+        // Ollama streams NDJSON — one JSON object per line
+        const lines = chunk.split('\n').filter((line) => line.trim().length > 0)
+        for (const line of lines) {
+          try {
+            const parsed = JSON.parse(line) as { message?: { content?: string }; done?: boolean }
+            const content = parsed.message?.content ?? ''
+            if (content) {
+              fullText += content
+              onChunk(content)
+            }
+          } catch {
+            // Skip malformed NDJSON lines
+          }
+        }
+      }
+    }
+
+    const sections = parseScriptText(fullText, scriptId)
+
+    return {
+      id: scriptId,
+      projectId: '',
+      sections,
+      aiBackendUsed: 'ollama',
+      prompt,
+      generatedAt: new Date().toISOString(),
+    }
+  }
+
+  async refineSyncPoints(script: Script, domEvents: DOMEvent[]): Promise<SyncPoint[]> {
+    try {
+      const response = await this.chat([
+        {
+          role: 'system',
+          content: 'You are a video sync point analyzer. Output JSON array of sync points.',
+        },
+        {
+          role: 'user',
+          content: `Script:\n${script.sections.map((s) => s.text).join('\n\n')}\n\nDOM events:\n${JSON.stringify(domEvents.slice(0, 50), null, 2)}\n\nReturn a JSON array of sync points.`,
+        },
+      ])
+
       const jsonMatch = response.match(/\[[\s\S]*\]/)
       if (jsonMatch) {
-        return JSON.parse(jsonMatch[0])
+        const raw = JSON.parse(jsonMatch[0]) as Array<Record<string, unknown>>
+        return raw.map((item) => ({
+          id: crypto.randomUUID(),
+          timelineId: '',
+          timestamp: Number(item.timestamp) || 0,
+          type: ['freeze', 'zoom', 'annotation', 'transition'].includes(String(item.type))
+            ? (String(item.type) as SyncPoint['type'])
+            : 'annotation',
+          source: 'script' as const,
+          duration: Number(item.duration) || 0,
+          confidence: Number(item.confidence) || 0.5,
+        }))
       }
-    } catch {
-      // Parse error
+    } catch (err) {
+      console.error('refineSyncPoints failed:', err)
     }
     return []
   }
@@ -86,15 +172,23 @@ export class OllamaProvider implements IAIProvider {
   }
 
   private async chat(messages: { role: string; content: string }[]): Promise<string> {
-    const response = await fetch(`${this.baseUrl}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: this.model,
-        messages,
-        stream: false,
-      }),
-    })
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 120_000)
+    let response: Response
+    try {
+      response = await fetch(`${this.baseUrl}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: this.model,
+          messages,
+          stream: false,
+        }),
+        signal: controller.signal,
+      })
+    } finally {
+      clearTimeout(timer)
+    }
 
     if (!response.ok) {
       throw new Error(`Ollama API error: ${response.status} ${response.statusText}`)

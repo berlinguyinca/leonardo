@@ -5,7 +5,7 @@ import type { DOMEvent } from '@shared/types/events'
 import type { SyncPoint } from '@shared/types/timeline'
 import { getSystemPrompt, buildScriptPrompt } from './prompt-templates'
 import { parseScriptText } from './script-parser'
-import { runCLI, isCLIAvailable } from './cli-runner'
+import { runCLI, runCLIStreaming, isCLIAvailable } from './cli-runner'
 
 export class ClaudeProvider implements IAIProvider {
   readonly name = 'Claude (CLI)'
@@ -32,12 +32,41 @@ export class ClaudeProvider implements IAIProvider {
       '--model', this.model,
       '--no-session-persistence',
       '--tools', '',
-      '--bare',
     ]
 
     const result = await runCLI(this.cliPath, args, userMessage)
     const text = result.stdout.trim()
     const sections = parseScriptText(text, scriptId)
+
+    return {
+      id: scriptId,
+      projectId: '',
+      sections,
+      aiBackendUsed: 'claude',
+      prompt,
+      generatedAt: new Date().toISOString(),
+    }
+  }
+
+  async generateScriptStream(
+    prompt: string,
+    context: ScriptGenContext,
+    onChunk: (chunk: string) => void,
+  ): Promise<Script> {
+    const scriptId = uuid()
+    const userMessage = `${prompt}\n\n${buildScriptPrompt(context)}`
+
+    const args = [
+      '-p',
+      '--system-prompt', getSystemPrompt(),
+      '--output-format', 'text',
+      '--model', this.model,
+      '--no-session-persistence',
+      '--tools', '',
+    ]
+
+    const fullOutput = await runCLIStreaming(this.cliPath, args, userMessage, onChunk)
+    const sections = parseScriptText(fullOutput.trim(), scriptId)
 
     return {
       id: scriptId,
@@ -70,7 +99,6 @@ export class ClaudeProvider implements IAIProvider {
       '--model', this.model,
       '--no-session-persistence',
       '--tools', '',
-      '--bare',
     ]
 
     try {
@@ -101,7 +129,7 @@ export class ClaudeProvider implements IAIProvider {
 
   async testConnection(): Promise<boolean> {
     try {
-      const args = ['-p', '--bare', '--tools', '', '--no-session-persistence', 'ping']
+      const args = ['-p', '--tools', '', '--no-session-persistence', 'ping']
       const result = await runCLI(this.cliPath, args, undefined, 30_000)
       return result.stdout.length > 0
     } catch {

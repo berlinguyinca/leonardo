@@ -9,12 +9,15 @@ export function RecordingBrowser(): React.ReactNode {
   const [canGoForward, setCanGoForward] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [webviewPreloadPath, setWebviewPreloadPath] = useState<string | null>(null)
+  const [preloadError, setPreloadError] = useState<string | null>(null)
   const setCurrentUrl = useRecordingStore((s) => s.setCurrentUrl)
   const targetResolution = useRecordingStore((s) => s.targetResolution)
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.leonardo?.recording?.getWebviewPreloadPath) {
-      window.leonardo.recording.getWebviewPreloadPath().then(setWebviewPreloadPath)
+      window.leonardo.recording.getWebviewPreloadPath()
+        .then(setWebviewPreloadPath)
+        .catch(() => setPreloadError('Unable to load browser preload script'))
     }
   }, [])
 
@@ -78,7 +81,7 @@ export function RecordingBrowser(): React.ReactNode {
       webview.removeEventListener('did-stop-loading', onStopLoading)
       webview.removeEventListener('ipc-message', onIpcMessage)
     }
-  }, [setCurrentUrl])
+  }, [setCurrentUrl, webviewPreloadPath])
 
   return (
     <div className="recording-browser">
@@ -132,15 +135,21 @@ export function RecordingBrowser(): React.ReactNode {
           overflow: 'hidden',
         }}
       >
-        <webview
-          ref={webviewRef as React.Ref<Electron.WebviewTag>}
-          src="https://example.com"
-          className="recording-webview"
-          style={{ width: '100%', height: '100%' }}
-          /* @ts-expect-error webview attributes are not fully typed */
-          allowpopups="true"
-          {...(webviewPreloadPath ? { preload: webviewPreloadPath } : {})}
-        />
+        {webviewPreloadPath ? (
+          <webview
+            ref={webviewRef as React.Ref<Electron.WebviewTag>}
+            src="https://example.com"
+            className="recording-webview"
+            style={{ width: '100%', height: '100%' }}
+            /* @ts-expect-error webview attributes are not fully typed */
+            allowpopups="false"
+            preload={webviewPreloadPath}
+          />
+        ) : (
+          <div className="browser-loading">
+            {preloadError ?? 'Loading browser...'}
+          </div>
+        )}
       </div>
 
       {/* Recording Controls */}

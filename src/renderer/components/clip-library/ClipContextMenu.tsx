@@ -69,6 +69,18 @@ export function ClipContextMenu({ clip, position, onClose }: ClipContextMenuProp
       })
       if (result.success && result.script) {
         setSections(result.script.sections)
+        useScriptStore.getState().setClipScript(clip.id, result.script.sections)
+        // Auto-split the timeline segment if multiple sections
+        const timeline = useTimelineStore.getState().timeline
+        if (timeline && result.script.sections.length > 1) {
+          for (const track of timeline.tracks) {
+            const segment = track.segments.find((s) => s.sourceFile === clip.filePath)
+            if (segment) {
+              useTimelineStore.getState().splitClipBySections(segment.id, result.script.sections)
+              break
+            }
+          }
+        }
         setEditorView('script-only')
         onClose()
       } else {

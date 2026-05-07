@@ -1,7 +1,9 @@
+import { useState, useEffect } from 'react'
 import { useTimelineStore } from '../../stores/timeline-store'
-import { usePlayhead } from '../../hooks/usePlayhead'
+import { playheadEmitter } from '../../hooks/PlayheadEmitter'
 
 const STEP_MS = 5_000
+const FRAME_MS = Math.round(1000 / 15) // 1 frame at 15fps capture rate
 
 function formatTime(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000)
@@ -66,11 +68,24 @@ function IconGoToEnd() {
   )
 }
 
-export function TransportControls(): React.ReactNode {
+interface TransportControlsProps {
+  seekTo: (timeMs: number) => void
+}
+
+export function TransportControls({ seekTo }: TransportControlsProps): React.ReactNode {
   const isPlaying = useTimelineStore((s) => s.isPlaying)
-  const position = useTimelineStore((s) => s.playheadPosition)
+  const storePosition = useTimelineStore((s) => s.playheadPosition)
   const duration = useTimelineStore((s) => s.timeline?.duration ?? 0)
-  const { seekTo } = usePlayhead()
+  const [emitterPosition, setEmitterPosition] = useState(storePosition)
+
+  useEffect(() => {
+    if (!isPlaying) return
+    const handler = (pos: number) => setEmitterPosition(pos)
+    playheadEmitter.on('position', handler)
+    return () => { playheadEmitter.off('position', handler) }
+  }, [isPlaying])
+
+  const position = isPlaying ? emitterPosition : storePosition
 
   return (
     <div className="transport-controls">
@@ -111,6 +126,9 @@ export function TransportControls(): React.ReactNode {
       </button>
       <span className="transport-time">
         {formatTime(position)} / {formatTime(duration)}
+      </span>
+      <span className="transport-frame">
+        Frame {Math.floor(position / FRAME_MS) + 1} / {Math.max(1, Math.ceil(duration / FRAME_MS))}
       </span>
     </div>
   )

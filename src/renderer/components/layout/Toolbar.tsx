@@ -1,11 +1,14 @@
 import { useUIStore } from '../../stores/ui-store'
 import type { WorkspacePreset } from '../../stores/ui-store'
+import { useProjectStore } from '../../stores/project-store'
 import { ViewModeToggle } from './ViewModeToggle'
 
 const MENU_ITEMS = ['File', 'Edit', 'View', 'Playback'] as const
 const WORKSPACE_TABS: { preset: WorkspacePreset; label: string }[] = [
   { preset: 'recording', label: 'Record' },
-  { preset: 'editing', label: 'Edit' },
+  { preset: 'script', label: 'Script' },
+  { preset: 'compose', label: 'Compose' },
+  { preset: 'effects', label: 'Effects' },
   { preset: 'export', label: 'Export' },
 ]
 
@@ -16,6 +19,10 @@ export function Toolbar(): React.ReactNode {
   const setWorkspacePreset = useUIStore((s) => s.setWorkspacePreset)
   const setShowProjectWizard = useUIStore((s) => s.setShowProjectWizard)
   const setShowLogViewer = useUIStore((s) => s.setShowLogViewer)
+  const activeProjectId = useProjectStore((s) => s.activeProjectId)
+  const projects = useProjectStore((s) => s.projects)
+  const setActiveProject = useProjectStore((s) => s.setActiveProject)
+  const activeProject = projects.find((p) => p.id === activeProjectId)
 
   return (
     <header className="toolbar">
@@ -26,7 +33,16 @@ export function Toolbar(): React.ReactNode {
       </div>
 
       <div className="toolbar-center">
-        <span className="toolbar-brand">LEONARDO</span>
+        <button
+          className="toolbar-brand"
+          onClick={() => setActiveProject(null)}
+          title="Return to project overview"
+        >
+          LEONARDO
+        </button>
+        {activeProject && (
+          <span className="toolbar-project-name">{activeProject.name}</span>
+        )}
       </div>
 
       <div className="toolbar-right">
@@ -41,7 +57,7 @@ export function Toolbar(): React.ReactNode {
           </button>
         ))}
         <div className="toolbar-right-divider" />
-        {workspacePreset !== 'recording' && <ViewModeToggle />}
+        {workspacePreset === 'compose' && <ViewModeToggle />}
         <button
           className="toolbar-btn"
           onClick={() => setShowProjectWizard(true)}

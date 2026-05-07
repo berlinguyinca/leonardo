@@ -2,6 +2,8 @@
 import { spawn, execFileSync } from 'child_process'
 import path from 'path'
 
+const MAX_OUTPUT_BYTES = 10 * 1024 * 1024 // 10MB
+
 export interface CLIRunResult {
   stdout: string
   stderr: string
@@ -18,6 +20,10 @@ export function runCLI(
   timeoutMs: number = 120_000,
 ): Promise<CLIRunResult> {
   return new Promise((resolve, reject) => {
+    // Log the command (redact long stdin to avoid flooding logs)
+    const argSummary = args.filter((a) => a.length < 200).join(' ')
+    console.log(`[CLI] Spawning: ${binary} ${argSummary} (stdin: ${stdinData ? `${stdinData.length} chars` : 'none'})`)
+
     const proc = spawn(binary, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env },
@@ -35,6 +41,11 @@ export function runCLI(
 
     proc.stdout.on('data', (chunk: Buffer) => {
       stdout += chunk.toString()
+      if (stdout.length > MAX_OUTPUT_BYTES) {
+        killed = true
+        proc.kill('SIGTERM')
+        reject(new Error(`${binary} output exceeded maximum size of 10MB`))
+      }
     })
 
     proc.stderr.on('data', (chunk: Buffer) => {
@@ -60,14 +71,105 @@ export function runCLI(
       }
 
       if (code !== 0) {
-        reject(new Error(`${binary} exited with code ${code}: ${stderr.slice(-500)}`))
+        // Include both stderr and stdout in error — some CLIs (e.g. Claude) write errors to stdout
+        const errorOutput = stderr.trim() || stdout.trim()
+        const detail = errorOutput.slice(-500) || '(no output)'
+        console.error(`[CLI] ${binary} exited with code ${code}: ${detail}`)
+        reject(new Error(`${binary} exited with code ${code}: ${detail}`))
         return
       }
 
+      console.log(`[CLI] ${binary} completed successfully (${stdout.length} chars output)`)
       resolve({ stdout, stderr })
     })
 
     if (stdinData !== undefined) {
+      proc.stdin.write(stdinData)
+      proc.stdin.end()
+    } else {
+      proc.stdin.end()
+    }
+  })
+}
+
+/**
+ * Run a CLI binary with streaming stdout.
+ * Calls onStdout per data event on stdout.
+ * Returns the full concatenated output when the process completes.
+ */
+export function runCLIStreaming(
+  binary: string,
+  args: string[],
+  stdinData: string | null,
+  onStdout: (chunk: string) => void,
+  timeoutMs = 120_000,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const argSummary = args.filter((a) => a.length < 200).join(' ')
+    console.log(`[CLI:stream] Spawning: ${binary} ${argSummary} (stdin: ${stdinData ? `${stdinData.length} chars` : 'none'})`)
+
+    const proc = spawn(binary, args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env },
+    })
+
+    let stdout = ''
+    let stderr = ''
+    let killed = false
+
+    const timer = setTimeout(() => {
+      killed = true
+      proc.kill('SIGTERM')
+      reject(new Error(`${binary} timed out after ${timeoutMs}ms`))
+    }, timeoutMs)
+
+    proc.stdout.on('data', (chunk: Buffer) => {
+      const text = chunk.toString()
+      stdout += text
+      if (stdout.length > MAX_OUTPUT_BYTES) {
+        killed = true
+        proc.kill('SIGTERM')
+        reject(new Error(`${binary} output exceeded maximum size of 10MB`))
+        return
+      }
+      onStdout(text)
+    })
+
+    proc.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString()
+    })
+
+    proc.on('error', (err: NodeJS.ErrnoException) => {
+      clearTimeout(timer)
+      if (err.code === 'ENOENT') {
+        reject(new Error(`CLI binary "${binary}" not found. Ensure it is installed and on your PATH.`))
+      } else {
+        reject(err)
+      }
+    })
+
+    proc.on('close', (code, signal) => {
+      clearTimeout(timer)
+      if (killed) return
+
+      if (signal) {
+        reject(new Error(`${binary} was terminated by signal ${signal}`))
+        return
+      }
+
+      if (code !== 0) {
+        const errorOutput = stderr.trim() || stdout.trim()
+        const detail = errorOutput.slice(-500) || '(no output)'
+        console.error(`[CLI:stream] ${binary} exited with code ${code}: ${detail}`)
+        reject(new Error(`${binary} exited with code ${code}: ${detail}`))
+        return
+      }
+
+      console.log(`[CLI:stream] ${binary} completed successfully (${stdout.length} chars output)`)
+      resolve(stdout)
+    })
+
+    if (stdinData !== null && stdinData !== undefined) {
       proc.stdin.write(stdinData)
       proc.stdin.end()
     } else {

@@ -7,7 +7,7 @@ import { useUIStore } from '../../src/renderer/stores/ui-store'
 import type { Script, ScriptSection } from '@shared/types/ai'
 
 const mockLoadProjectScripts = vi.fn()
-const mockWorkspacePreset = 'editing'
+const mockWorkspacePreset = 'compose'
 
 vi.mock('../../src/renderer/stores/script-store', () => ({
   useScriptStore: (selector: (s: { loadProjectScripts: typeof mockLoadProjectScripts }) => unknown) =>

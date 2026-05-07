@@ -1,6 +1,7 @@
 node_modules/
 dist/
 out/
+release/
 .dev.pid
 *.db
 *.db-wal
@@ -10,3 +11,6 @@ out/
 .env.local
 .superpowers/
 .worktrees/
+.codesight/
+.omc/state/
+.omc/project-memory.json

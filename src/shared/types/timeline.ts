@@ -1,7 +1,7 @@
 export type SyncPointType = 'freeze' | 'zoom' | 'annotation' | 'transition'
 export type SyncPointSource = 'dom' | 'script' | 'manual'
 export type TrackType = 'recording' | 'clip' | 'overlay' | 'audio'
-export type TransitionType = 'fade' | 'cut' | 'dissolve'
+export type TransitionType = 'fade' | 'cut' | 'dissolve' | 'wipe'
 
 export interface SyncTimeline {
   id: string
@@ -29,7 +29,10 @@ export interface Segment {
   endTime: number
   sourceFile: string
   sourceOffset: number
+  /** Duration of available source material from sourceOffset — clamp playback here */
+  sourceDuration?: number
   label: string
+  metadata?: string
 }
 
 export interface SyncPoint {

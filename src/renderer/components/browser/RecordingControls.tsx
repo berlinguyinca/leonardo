@@ -4,6 +4,7 @@ import { useUIStore } from '../../stores/ui-store'
 import { useLibraryStore } from '../../stores/library-store'
 import { useTimelineStore } from '../../stores/timeline-store'
 import { useProjectStore } from '../../stores/project-store'
+import { useToastStore } from '../../stores/toast-store'
 import type { Clip } from '@shared/types/events'
 
 interface RecordingControlsProps {
@@ -41,9 +42,6 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
   const [pausedDuration, setPausedDuration] = useState(0)
   const [pendingClip, setPendingClip] = useState<Clip | null>(null)
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-
   const startTimer = useCallback(() => {
     startTimeRef.current = Date.now() - pausedDuration
     timerRef.current = setInterval(() => {
@@ -58,29 +56,9 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
     }
   }, [])
 
-  const stopMediaRecorder = useCallback((): Promise<Blob> => {
-    return new Promise((resolve) => {
-      const recorder = mediaRecorderRef.current
-      if (!recorder || recorder.state === 'inactive') {
-        resolve(new Blob([], { type: 'video/webm' }))
-        return
-      }
-      recorder.onstop = () => {
-        recorder.stream.getTracks().forEach((t) => t.stop())
-        resolve(new Blob(chunksRef.current, { type: 'video/webm' }))
-      }
-      mediaRecorderRef.current = null
-      recorder.stop()
-    })
-  }, [])
-
   useEffect(() => {
-    return () => {
-      stopTimer()
-      // Stop media recorder if component unmounts during recording
-      void stopMediaRecorder()
-    }
-  }, [stopTimer, stopMediaRecorder])
+    return () => { stopTimer() }
+  }, [stopTimer])
 
   useEffect(() => {
     if (!pendingClip) return
@@ -103,98 +81,80 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
       stopTimer()
       return
     }
-    await window.leonardo.recording.start({ webviewId: webContentsId })
-
-    // Start screen capture via MediaRecorder
     try {
-      chunksRef.current = []
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: 30 } as MediaTrackConstraints,
-      })
-      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' })
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data)
+      const result = await window.leonardo.recording.start({ webviewId: webContentsId, projectId: activeProjectId ?? undefined })
+      if (!result.success) {
+        throw new Error(result.error ?? 'Recording failed to start')
       }
-      recorder.start(1000) // collect a chunk every second
-      mediaRecorderRef.current = recorder
+      if (result.warning) {
+        useToastStore.getState().addToast(result.warning, 'warning')
+      }
     } catch (err) {
-      // If screen capture fails (e.g. user denied), continue recording without video
-      console.warn('[RecordingControls] Screen capture failed:', err)
+      setStatus('idle')
+      restorePanelState()
+      stopTimer()
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      useToastStore.getState().addToast(`Recording failed: ${msg}`, 'error')
     }
-  }, [status, setStatus, setRecordingDuration, startTimer, stopTimer, collapseAllPanels, restorePanelState, webviewRef])
+  }, [status, setStatus, setRecordingDuration, startTimer, stopTimer, collapseAllPanels, restorePanelState, webviewRef, activeProjectId])
 
-  const handlePause = useCallback(() => {
+  const handlePause = useCallback(async () => {
     setStatus('paused')
     stopTimer()
     setPausedDuration(recordingDuration)
-
-    window.leonardo.recording.pause()
+    try {
+      await window.leonardo.recording.pause()
+    } catch {
+      useToastStore.getState().addToast('Failed to pause recording', 'warning')
+    }
   }, [setStatus, stopTimer, recordingDuration])
 
-  const handleResume = useCallback(() => {
+  const handleResume = useCallback(async () => {
     setStatus('recording')
     startTimer()
-
-    window.leonardo.recording.resume()
+    try {
+      await window.leonardo.recording.resume()
+    } catch {
+      useToastStore.getState().addToast('Failed to resume recording', 'warning')
+    }
   }, [setStatus, startTimer])
 
   const handleStop = useCallback(async () => {
     stopTimer()
     setStatus('processing')
     try {
-      // Stop both the recorder and the IPC session in parallel
-      const [blob, result] = await Promise.all([
-        stopMediaRecorder(),
-        window.leonardo.recording.stop(),
-      ])
-
-      if (!result.success || !result.recordingId || !result.outputDir) return
-
-      // Skip video pipeline if no video was captured (e.g. screen share denied)
-      if (blob.size === 0) return
-
-      // Save the WebM blob to disk
-      const buffer = await blob.arrayBuffer()
-      const saveResult = await window.leonardo.recording.saveBlob({
-        outputDir: result.outputDir,
-        buffer,
-      })
-
-      if (!saveResult.success) {
-        console.warn('[RecordingControls] Failed to save blob:', saveResult.error)
+      const result = await window.leonardo.recording.stop()
+      if (!result.success || !result.recordingId || !result.videoPath) {
+        useToastStore.getState().addToast(
+          `Recording failed: ${result.error ?? 'No video was captured'}`,
+          'error',
+        )
         return
       }
 
-      // Convert WebM → MP4 and persist .events.json
-      const convertResult = await window.leonardo.recording.convert({
-        recordingId: result.recordingId,
-        webmPath: saveResult.webmPath,
-        outputDir: result.outputDir,
+      const currentClipCount = useLibraryStore.getState().clips.length
+      const clip: Clip = {
+        id: result.recordingId,
         projectId: activeProjectId ?? '',
-      })
-
-      if (convertResult.success && convertResult.videoPath) {
-        const currentClipCount = useLibraryStore.getState().clips.length
-        const clip: Clip = {
-          id: result.recordingId,
-          projectId: activeProjectId ?? '',
-          filePath: convertResult.videoPath,
-          duration: result.duration ?? recordingDuration,
-          url: currentUrl,
-          resolution: { width: targetResolution.width, height: targetResolution.height },
-          createdAt: new Date().toISOString(),
-          label: `Recording ${currentClipCount + 1}`,
-        }
-        await addClip(clip)
-        setHighlightedClip(clip.id)
-        setPendingClip(clip)
+        filePath: result.videoPath,
+        duration: result.duration ?? recordingDuration,
+        url: currentUrl,
+        resolution: { width: targetResolution.width, height: targetResolution.height },
+        createdAt: new Date().toISOString(),
+        label: `Recording ${currentClipCount + 1}`,
       }
+      await addClip(clip)
+      setHighlightedClip(clip.id)
+      setPendingClip(clip)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      useToastStore.getState().addToast(`Recording stop failed: ${msg}`, 'error')
     } finally {
       restorePanelState()
       setStatus('idle')
     }
   }, [
-    stopTimer, setStatus, stopMediaRecorder, activeProjectId, recordingDuration,
+    stopTimer, setStatus, activeProjectId, recordingDuration,
     currentUrl, targetResolution, addClip, setHighlightedClip, restorePanelState,
   ])
 
@@ -247,7 +207,7 @@ export function RecordingControls({ webviewRef }: RecordingControlsProps): React
           <button
             onClick={() => {
               addClipToTimeline(pendingClip)
-              setWorkspacePreset('editing')
+              setWorkspacePreset('script')
               setEditorView('inline')
               setTimelineCollapsed(false)
               setPendingClip(null)
